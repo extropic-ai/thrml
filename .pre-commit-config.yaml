@@ -1,0 +1,27 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+        args: [--line-length=120]
+
+  - repo: https://github.com/psf/black
+    rev: 24.1.0
+    hooks:
+      - id: black
+        args: [--line-length=120]
+
+  - repo: https://github.com/PyCQA/isort
+    rev: 6.0.1
+    hooks:
+      - id: isort
+        args: [--profile=black]
+
+  - repo: https://github.com/RobertCraigie/pyright-python
+    rev: v1.1.404
+    hooks:
+      - id: pyright
+        additional_dependencies: [equinox, jaxtyping]
+        files: thrml/

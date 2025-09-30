@@ -1,0 +1,35 @@
+name: Run examples
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the specified branches
+  push:
+     branches:
+       - main
+  pull_request:
+     branches:
+       - main
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  examples:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      max-parallel: 4
+      matrix:
+        python-version: ["3.10", "3.11"]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run notebook examples
+        run: |
+          pip install .[testing,examples]
+          pytest --nbmake --nbmake-timeout=3000 --ignore=examples/02_spin_models.ipynb examples/
