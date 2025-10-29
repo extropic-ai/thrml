@@ -17,7 +17,7 @@ From a technical point of view, the internal structure compiles factor-based int
 Requires Python 3.10+.
 
 ```bash
-pip install thrml
+uv pip install thrml
 ```
 
 ## Documentation
@@ -59,13 +59,13 @@ To get started, you'll need to create a virtual environment and install the requ
 
 ```bash
 # Create a virtual environment
-python -m venv venv
+uv venv venv
 
 # Activate the virtual environment
 source venv/bin/activate
 
 # Install the package with development dependencies
-pip install -e ".[development,testing,examples]"
+uv pip install -e ".[development,testing,examples]"
 
 # Install pre-commit hooks
 pre-commit install

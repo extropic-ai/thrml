@@ -19,7 +19,7 @@ Features include:
 ## Installation
 
 ```bash
-pip install thrml
+uv pip install thrml
 ```
 
 Or install from source:
@@ -27,7 +27,7 @@ Or install from source:
 ```bash
 git clone https://github.com/extropic-ai/thrml
 cd thrml
-pip install -e .
+uv pip install -e .
 ```
 
 ## Quick example
