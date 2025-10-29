@@ -1,6 +1,6 @@
 import abc
 from collections import defaultdict
-from typing import TYPE_CHECKING, Callable, Sequence, TypeVar
+from typing import TYPE_CHECKING, Callable, Optional, Sequence, TypeVar
 
 import equinox as eqx
 import jax
@@ -12,6 +12,7 @@ from thrml.block_management import Block, block_state_to_global, from_global_sta
 
 if TYPE_CHECKING:
     from thrml.block_sampling import _State, BlockSamplingProgram
+    from thrml.models.ebm import AbstractEBM
 
 from thrml.pgm import AbstractNode
 
@@ -90,6 +91,58 @@ class StateObserver(AbstractObserver):
 
 def _f_identity(*x):
     return x[0]
+
+
+class EnergyObserver(AbstractObserver):
+    """
+    Observer that records the energy of a sampling program.
+
+    The energy function must accept a list of block-organised states together with the program's block ordering.
+    """
+
+    _energy_fn: Callable[[list[PyTree], list[Block]], Array]
+    _transform: Callable[[Array], PyTree]
+    _carry_init: Optional[ObserveCarry]
+    _update_carry: Optional[Callable[[Optional[ObserveCarry], Array, Int[Array, ""]], ObserveCarry]]
+
+    def __init__(
+        self,
+        ebm: Optional["AbstractEBM"] = None,
+        *,
+        energy_fn: Optional[Callable[[list[PyTree], list[Block]], Array]] = None,
+        transform: Optional[Callable[[Array], PyTree]] = None,
+        carry_init: Optional[ObserveCarry] = None,
+        update_carry: Optional[Callable[[Optional[ObserveCarry], Array, Int[Array, ""]], ObserveCarry]] = None,
+    ):
+        if (ebm is None) == (energy_fn is None):
+            raise ValueError("Provide exactly one of ebm or energy_fn.")
+
+        energy_callable = energy_fn if energy_fn is not None else ebm.energy  # type: ignore[union-attr]
+
+        self._energy_fn = energy_callable
+        self._transform = transform if transform is not None else lambda x: x
+        self._carry_init = carry_init
+        self._update_carry = update_carry
+
+    def init(self) -> Optional[ObserveCarry]:
+        return self._carry_init
+
+    def __call__(
+        self,
+        program: "BlockSamplingProgram",
+        state_free: list["_State"],
+        state_clamped: list["_State"],
+        carry: Optional[ObserveCarry],
+        iteration: Int[Array, ""],
+    ) -> tuple[Optional[ObserveCarry], PyTree]:
+        block_state = list(state_free) + list(state_clamped)
+        energy = jnp.asarray(self._energy_fn(block_state, program.gibbs_spec.blocks))
+
+        next_carry = carry
+        if self._update_carry is not None:
+            next_carry = self._update_carry(carry, energy, iteration)
+
+        return next_carry, self._transform(energy)
 
 
 class MomentAccumulatorObserver(AbstractObserver):

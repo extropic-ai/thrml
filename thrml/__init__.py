@@ -24,6 +24,7 @@ from .factor import FactorSamplingProgram as FactorSamplingProgram
 from .factor import WeightedFactor as WeightedFactor
 from .interaction import InteractionGroup as InteractionGroup
 from .observers import AbstractObserver as AbstractObserver
+from .observers import EnergyObserver as EnergyObserver
 from .observers import MomentAccumulatorObserver as MomentAccumulatorObserver
 from .observers import StateObserver as StateObserver
 from .pgm import AbstractNode as AbstractNode
