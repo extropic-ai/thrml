@@ -18,6 +18,8 @@ Features include:
 
 ## Installation
 
+Requires >=python 3.10
+
 ```bash
 pip install thrml
 ```
