@@ -416,6 +416,21 @@ class SamplingSchedule:
     n_samples: int
     steps_per_sample: int
 
+    def __post_init__(self):
+        if not isinstance(self.n_warmup, int):
+            raise TypeError(f"n_warmup must be int, got {type(self.n_warmup).__name__}")
+        if not isinstance(self.n_samples, int):
+            raise TypeError(f"n_samples must be int, got {type(self.n_samples).__name__}")
+        if not isinstance(self.steps_per_sample, int):
+            raise TypeError(f"steps_per_sample must be int, got {type(self.steps_per_sample).__name__}")
+
+        if self.n_warmup < 0:
+            raise ValueError(f"n_warmup must be non-negative, got {self.n_warmup}")
+        if self.n_samples < 1:
+            raise ValueError(f"n_samples must be positive, got {self.n_samples}")
+        if self.steps_per_sample < 1:
+            raise ValueError(f"steps_per_sample must be positive, got {self.steps_per_sample}")
+
     def __hash__(self) -> int:
         return hash((self.n_warmup, self.n_samples, self.steps_per_sample))
 
