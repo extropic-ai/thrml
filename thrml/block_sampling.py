@@ -357,7 +357,7 @@ def sample_blocks(
     - Updated free-block state list and sampler-state list.
     """
 
-    # gaurdrail state/block compatability here as everything else calls this
+    # gaurdrail state/block compatibility here as everything else calls this
 
     sds = {node_type: jax.tree.unflatten(*sd) for node_type, sd in program.gibbs_spec.node_shape_dtypes.items()}
     verify_block_state(program.gibbs_spec.free_blocks, state_free, sds, -1)
