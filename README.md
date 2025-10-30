@@ -55,21 +55,57 @@ samples = sample_states(k_samp, program, schedule, init_state, [], [Block(nodes)
 
 ## Developing
 
-To get started, you'll need to create a virtual environment and install the requirements:
+### Option 1: Using uv (Recommended - Fast!)
+
+[uv](https://docs.astral.sh/uv/) is a fast Python package installer and resolver. Installation is ~10x faster than pip.
+
+```bash
+# Install uv if you haven't already
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create a virtual environment and install dependencies
+uv venv
+uv pip install -e ".[development,testing,examples]"
+
+# Activate the virtual environment
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install pre-commit hooks
+uv pip install pre-commit
+pre-commit install
+```
+
+### Option 2: Using pip
 
 ```bash
 # Create a virtual environment
 python -m venv venv
 
 # Activate the virtual environment
-source venv/bin/activate
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install the package with development dependencies
 pip install -e ".[development,testing,examples]"
 
 # Install pre-commit hooks
+pip install pre-commit
 pre-commit install
 ```
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=thrml --cov-report=html
+
+# Run specific test file
+pytest tests/test_ising.py -v
+```
+
+### Code Quality
 
 The pre-commit hooks will automatically run code formatting and linting tools (ruff, black, isort, pyright) on every commit to ensure consistent style.
 
