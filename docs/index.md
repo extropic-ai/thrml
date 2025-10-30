@@ -22,12 +22,26 @@ Features include:
 pip install thrml
 ```
 
-Or install from source:
+or
+
+```bash
+uv pip install thrml
+```
+
+For installing from the source:
 
 ```bash
 git clone https://github.com/extropic-ai/thrml
 cd thrml
 pip install -e .
+```
+
+or
+
+```bash
+git clone https://github.com/extropic-ai/thrml
+cd thrml
+uv pip install -e .
 ```
 
 ## Quick example
