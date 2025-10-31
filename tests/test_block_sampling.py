@@ -176,6 +176,7 @@ class TestSamplerValidation(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Expected 2 samplers"):
             BlockSamplingProgram(spec, [PlusMinusSampler()], [])
 
+
 class MultiNode(AbstractNode):
     pass
 
