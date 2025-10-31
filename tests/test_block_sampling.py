@@ -173,7 +173,7 @@ class TestSamplerValidation(unittest.TestCase):
         node_shape_dtypes = {ContinousScalarNode: jax.ShapeDtypeStruct((), jnp.float32)}
         spec = BlockGibbsSpec([block_a, block_b], [], node_shape_dtypes)
 
-        with self.assertRaisesRegex(ValueError, "expected 2 samplers"):
+        with self.assertRaisesRegex(ValueError, "Expected 2 samplers"):
             BlockSamplingProgram(spec, [PlusMinusSampler()], [])
 
 class MultiNode(AbstractNode):
