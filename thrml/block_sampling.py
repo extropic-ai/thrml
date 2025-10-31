@@ -173,7 +173,7 @@ class BlockSamplingProgram(eqx.Module):
 
         n_free_blocks = len(self.gibbs_spec.free_blocks)
         if len(self.samplers) != n_free_blocks:
-            raise ValueError(f"expected {n_free_blocks} samplers, received {len(self.samplers)}")
+            raise ValueError(f"Expected {n_free_blocks} samplers, received {len(self.samplers)}")
 
         # first, construct a map from every head node to each interaction it
         # shows up in and where it shows up in that interaction
