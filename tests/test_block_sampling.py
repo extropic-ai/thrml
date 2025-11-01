@@ -166,6 +166,17 @@ class TestPlusMinus(unittest.TestCase):
         self.assertIn("type", str(error.exception))
 
 
+class TestSamplerValidation(unittest.TestCase):
+    def test_mismatched_sampler_list_raises(self):
+        block_a = Block([ContinousScalarNode()])
+        block_b = Block([ContinousScalarNode()])
+        node_shape_dtypes = {ContinousScalarNode: jax.ShapeDtypeStruct((), jnp.float32)}
+        spec = BlockGibbsSpec([block_a, block_b], [], node_shape_dtypes)
+
+        with self.assertRaisesRegex(ValueError, "Expected 2 samplers"):
+            BlockSamplingProgram(spec, [PlusMinusSampler()], [])
+
+
 class MultiNode(AbstractNode):
     pass
 
