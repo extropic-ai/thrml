@@ -16,3 +16,9 @@ from .ising import IsingTrainingSpec as IsingTrainingSpec
 from .ising import estimate_kl_grad as estimate_kl_grad
 from .ising import estimate_moments as estimate_moments
 from .ising import hinton_init as hinton_init
+from .rbm import RBMEBM as RBMEBM
+from .rbm import RBMSamplingProgram as RBMSamplingProgram
+from .rbm import RBMTrainingSpec as RBMTrainingSpec
+from .rbm import estimate_rbm_grad as estimate_rbm_grad
+from .rbm import estimate_rbm_moments as estimate_rbm_moments
+from .rbm import rbm_init as rbm_init
