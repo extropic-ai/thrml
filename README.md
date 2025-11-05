@@ -26,6 +26,22 @@ or
 uv pip install thrml
 ```
 
+## Citing THRML
+
+If you use THRML in your research, please cite us!
+
+```
+@misc{jelinčič2025efficientprobabilistichardwarearchitecture,
+      title={An efficient probabilistic hardware architecture for diffusion-like models}, 
+      author={Andraž Jelinčič and Owen Lockwood and Akhil Garlapati and Guillaume Verdon and Trevor McCourt},
+      year={2025},
+      eprint={2510.23972},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2510.23972}, 
+}
+```
+
 ## Documentation
 
 Available at [docs.thrml.ai](https://docs.thrml.ai/en/latest/).
