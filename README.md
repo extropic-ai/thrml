@@ -1,6 +1,6 @@
 <h1 align='center'>THRML</h1>
 
-THRML is a JAX library for building and sampling probabilistic graphical models, with a focus on efficient block Gibbs sampling and energy-based models. Extropic is developing hardware to make sampling from certain classes of discrete PGMs massively more energy‑efficient; THRML provides GPU‑accelerated tools for block sampling on sparse, heterogeneous graphs, making it a natural place to prototype today and experiment with future Extropic hardware.
+THRML is a JAX library for building and sampling probabilistic graphical models, with a focus on efficient block Gibbs sampling and energy-based models. Extropic is developing hardware to make sampling from certain classes of discrete PGMs massively more energy efficient; THRML provides GPU‑accelerated tools for block sampling on sparse, heterogeneous graphs, making it a natural place to prototype today and experiment with future Extropic hardware.
 
 Features include:
 
@@ -10,7 +10,7 @@ Features include:
 - Discrete EBM utilities
 - Enables early experimentation with future Extropic hardware
 
-From a technical point of view, the internal structure compiles factor-based interactions to a compact "global" state representation, minimising Python loops and maximising array-level parallelism in JAX.
+From a technical point of view, the internal structure compiles factor-based interactions to a compact "global" state representation, minimizing Python loops and maximizing array-level parallelism in JAX.
 
 ## Installation
 
@@ -20,17 +20,22 @@ Requires Python 3.10+.
 pip install thrml
 ```
 
-or 
+or
 
 ```bash
 uv pip install thrml
 ```
 
+## Documentation
+
+Available at [docs.thrml.ai](https://docs.thrml.ai/en/latest/).
+
+
 ## Citing THRML
 
 If you use THRML in your research, please cite us!
 
-```
+```bibtex
 @misc{jelinčič2025efficientprobabilistichardwarearchitecture,
       title={An efficient probabilistic hardware architecture for diffusion-like models}, 
       author={Andraž Jelinčič and Owen Lockwood and Akhil Garlapati and Guillaume Verdon and Trevor McCourt},
@@ -41,11 +46,6 @@ If you use THRML in your research, please cite us!
       url={https://arxiv.org/abs/2510.23972}, 
 }
 ```
-
-## Documentation
-
-Available at [docs.thrml.ai](https://docs.thrml.ai/en/latest/).
-
 
 ## Quick example
 
