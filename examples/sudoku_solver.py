@@ -337,30 +337,35 @@ class SudokuSolver:
                         log_probs = np.zeros(9)
 
                         for candidate_val in range(9):
-                            # Count violations for this candidate in row, col, box
+                            # Count violations if we place candidate_val at (i,j)
+                            # Key: exclude the current cell when counting!
                             violations = 0.0
 
-                            # Row violations
+                            # Row violations: count occurrences in row excluding position j
                             row = grid[i, :]
-                            row_count = jnp.sum(row == candidate_val)
-                            if row_count > 0:  # Will have 1 if we place it
-                                violations += row_count * 10.0
+                            row_except_j = jnp.concatenate([row[:j], row[j+1:]])
+                            count_in_row = jnp.sum(row_except_j == candidate_val)
+                            violations += float(count_in_row) * 10.0
 
-                            # Column violations
+                            # Column violations: count occurrences in column excluding position i
                             col = grid[:, j]
-                            col_count = jnp.sum(col == candidate_val)
-                            if col_count > 0:
-                                violations += col_count * 10.0
+                            col_except_i = jnp.concatenate([col[:i], col[i+1:]])
+                            count_in_col = jnp.sum(col_except_i == candidate_val)
+                            violations += float(count_in_col) * 10.0
 
-                            # Box violations
+                            # Box violations: count occurrences in box excluding current cell
                             box_row, box_col = i // 3, j // 3
                             box = grid[box_row*3:(box_row+1)*3, box_col*3:(box_col+1)*3]
-                            box_count = jnp.sum(box.flatten() == candidate_val)
-                            if box_count > 0:
-                                violations += box_count * 10.0
+                            box_flat = box.flatten()
+                            # Current cell's position within the flattened box
+                            box_i, box_j = i % 3, j % 3
+                            box_idx = box_i * 3 + box_j
+                            box_except_current = jnp.concatenate([box_flat[:box_idx], box_flat[box_idx+1:]])
+                            count_in_box = jnp.sum(box_except_current == candidate_val)
+                            violations += float(count_in_box) * 10.0
 
                             # Boltzmann factor: -beta * violations
-                            log_probs[candidate_val] = -beta * float(violations)
+                            log_probs[candidate_val] = -beta * violations
 
                         # Sample new value
                         self.key, subkey = jax.random.split(self.key)
