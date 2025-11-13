@@ -29,7 +29,7 @@ examples = [
 testing = [
     "coverage==7.3.2",
     "pytest==7.2.0",
-    "nbmake==1.4.3",
+    "nbmake>=1.5.5",
     "networkx>=2.6.3",
     "optax>=0.2.4"
 ]
@@ -77,3 +77,8 @@ reportUnnecessaryTypeIgnoreComment = true
 include = ["thrml"]
 venvPath = "."
 venv = "venv"
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
