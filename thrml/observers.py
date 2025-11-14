@@ -210,25 +210,13 @@ class MomentAccumulatorObserver(AbstractObserver):
         sampled_state = self.f_transform(sampled_state, self.blocks_to_sample)
         sampled_state = list(sampled_state)
 
-        if len(sampled_state) == 0:
-            target_dtype = jnp.float32
-        else:
-            target_dtype = sampled_state[0].dtype
-            for state in sampled_state[1:]:
-                state_dtype = state.dtype
-                if state_dtype == target_dtype:
-                    continue
-                if target_dtype == jnp.bool_:
-                    target_dtype = state_dtype
-                    continue
-                if state_dtype == jnp.bool_:
-                    continue
-                target_dtype = jnp.result_type(target_dtype, state_dtype)
-
-        flat_state = jnp.zeros((len(self.flat_nodes_list),), dtype=target_dtype)
-        for type_slice, state in zip(self.flat_to_type_slices_list, sampled_state):
-            converted_state = state.astype(target_dtype)
-            flat_state = flat_state.at[type_slice].set(converted_state)
+        flat_state = jnp.zeros(len(self.flat_nodes_list))
+        result_type = jnp.result_type(*jax.tree.leaves(sampled_state))
+        for i, type_slice in enumerate(self.flat_to_type_slices_list):
+            if i == 0:
+                flat_state = flat_state.astype(result_type)
+            state = sampled_state[i]
+            flat_state = flat_state.at[type_slice].set(state)
 
         def accumulate_moment(mem_entry, sl):
             update = jnp.prod(flat_state[sl], axis=1)
