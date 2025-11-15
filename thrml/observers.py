@@ -208,11 +208,13 @@ class MomentAccumulatorObserver(AbstractObserver):
         sampled_state = from_global_state(global_state, program.gibbs_spec, self.blocks_to_sample)
 
         sampled_state = self.f_transform(sampled_state, self.blocks_to_sample)
+        sampled_state = list(sampled_state)
 
         flat_state = jnp.zeros(len(self.flat_nodes_list))
+        result_type = jnp.result_type(*jax.tree.leaves(sampled_state))
         for i, type_slice in enumerate(self.flat_to_type_slices_list):
             if i == 0:
-                flat_state = flat_state.astype(sampled_state[i].dtype)
+                flat_state = flat_state.astype(result_type)
             state = sampled_state[i]
             flat_state = flat_state.at[type_slice].set(state)
 
