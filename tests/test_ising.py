@@ -201,3 +201,65 @@ class TestEstimateKLGrad(unittest.TestCase):
 
         self.assertLess(error_w, 0.01)
         self.assertLess(error_b, 0.01)
+
+
+class TestEstimateKLGradFullyVisible(unittest.TestCase):
+    """Test that estimate_kl_grad works when all nodes are visible (no latent variables)."""
+
+    def test_fully_visible_ising(self):
+        import networkx as nx
+
+        key = jax.random.key(0)
+
+        G = nx.grid_2d_graph(4, 4)
+        nodes = [SpinNode() for _ in range(16)]
+        G = nx.relabel_nodes(G, {coord: nodes[i] for i, coord in enumerate(G.nodes)})
+        edges = list(G.edges)
+
+        model = IsingEBM(
+            nodes,
+            edges,
+            biases=jax.random.normal(key, (16,)),
+            weights=jax.random.normal(key, (len(edges),)),
+            beta=jnp.array(1.0),
+        )
+
+        coloring = nx.coloring.greedy_color(G, strategy="DSATUR")
+        free_blocks = [
+            Block([n for n, c in coloring.items() if c == color]) for color in range(max(coloring.values()) + 1)
+        ]
+
+        training_spec = IsingTrainingSpec(
+            model,
+            data_blocks=[Block(nodes)],
+            conditioning_blocks=[],
+            positive_sampling_blocks=[],
+            negative_sampling_blocks=free_blocks,
+            schedule_positive=SamplingSchedule(n_warmup=0, n_samples=1, steps_per_sample=0),
+            schedule_negative=SamplingSchedule(n_warmup=0, n_samples=1, steps_per_sample=1),
+        )
+
+        batch_size = 32
+        key, subkey = jax.random.split(key)
+        data = jax.random.bernoulli(subkey, 0.5, (batch_size, 16)).astype(jnp.bool_)
+
+        key, subkey = jax.random.split(key)
+        init_free = hinton_init(subkey, model, free_blocks, (batch_size,))
+
+        key, subkey = jax.random.split(key)
+        grad_w, grad_b, _, _ = estimate_kl_grad(
+            subkey,
+            training_spec,
+            nodes,
+            edges,
+            [data],
+            [],
+            [],
+            init_free,
+        )
+
+        # Gradients should be finite and have correct shapes
+        self.assertEqual(grad_w.shape, (len(edges),))
+        self.assertEqual(grad_b.shape, (16,))
+        self.assertTrue(jnp.all(jnp.isfinite(grad_w)))
+        self.assertTrue(jnp.all(jnp.isfinite(grad_b)))
