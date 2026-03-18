@@ -12,6 +12,7 @@ urls = { repository = "https://github.com/extropic-ai/thrml" }
 dependencies = [
     "equinox>=0.11.2",
     "jaxtyping>=0.2.23",
+    "optax>=0.2.4",
 ]
 
 [build-system]
