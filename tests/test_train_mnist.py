@@ -10,14 +10,7 @@ from jaxtyping import Array, Key
 
 from thrml.block_management import Block
 from thrml.block_sampling import SamplingSchedule, sample_states
-from thrml.models.ising import (
-    Edge,
-    IsingEBM,
-    IsingSamplingProgram,
-    IsingTrainingSpec,
-    estimate_kl_grad,
-    hinton_init,
-)
+from thrml.models.ising import Edge, IsingEBM, IsingSamplingProgram, IsingTrainingSpec, estimate_kl_grad, hinton_init
 from thrml.pgm import AbstractNode, SpinNode
 
 
@@ -92,7 +85,7 @@ class TestTrainMnist(unittest.TestCase):
         for digit in self.target_classes:
             self.sep_images_test[digit] = jnp.load(f"tests/mnist_test_data/sep_images_test_{digit}.npy")
 
-        (upper_grid, lower_grid, visible_nodes, upper_without_visible, all_nodes, all_edges) = get_double_grid(
+        upper_grid, lower_grid, visible_nodes, upper_without_visible, all_nodes, all_edges = get_double_grid(
             40, [1, 4, 15], data_dim, SpinNode, jax.random.key(0)
         )
 

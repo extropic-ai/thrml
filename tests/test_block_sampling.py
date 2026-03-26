@@ -15,11 +15,7 @@ from thrml.block_sampling import (
     sample_single_block,
     sample_states,
 )
-from thrml.conditional_samplers import (
-    AbstractConditionalSampler,
-    _SamplerState,
-    _State,
-)
+from thrml.conditional_samplers import AbstractConditionalSampler, _SamplerState, _State
 from thrml.interaction import InteractionGroup
 from thrml.pgm import AbstractNode
 

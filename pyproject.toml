@@ -35,7 +35,6 @@ testing = [
 ]
 development = [
     "black==25.1.0",
-    "ruff==0.11.0",
     "isort==5.12.0",
     "pyright==1.1.399",
     "mypy==1.5.1",
@@ -57,16 +56,8 @@ docs = [
 [tool.setuptools]
 packages = { find = { include = ["thrml", "thrml.*"] } }
 
-[tool.ruff]
-extend-include = ["*.ipynb"]
-src = []
-line-length = 120
-
-[tool.ruff.lint]
-# F722: Syntax error in forward annotation
-ignore = ["F722"]
-
 [tool.isort]
+profile = "black"
 line_length = 120
 
 [tool.black]

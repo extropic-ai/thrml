@@ -32,7 +32,7 @@ uv pip install -e ".[development,testing,examples]"
 pre-commit install
 ```
 
-The pre-commit hooks will automatically run code formatting and linting tools (ruff, black, isort, pyright) on every commit to ensure consistent style.
+The pre-commit hooks will automatically run code formatting and linting tools (black, isort, flake8, pyright) on every commit to ensure consistent style.
 
 If you want to skip pre-commit (for a WIP commit), you can use the `--no-verify` flag:
 

@@ -8,12 +8,7 @@ import numpy as np
 from jax import numpy as jnp
 from jaxtyping import Array, Key, PyTree, Shaped
 
-from thrml.block_management import (
-    Block,
-    BlockSpec,
-    block_state_to_global,
-    verify_block_state,
-)
+from thrml.block_management import Block, BlockSpec, block_state_to_global, verify_block_state
 from thrml.interaction import InteractionGroup
 from thrml.pgm import DEFAULT_NODE_SHAPE_DTYPES, AbstractNode
 

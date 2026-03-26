@@ -9,12 +9,7 @@ import numpy as np
 from jax import numpy as jnp
 
 from thrml.block_management import Block
-from thrml.block_sampling import (
-    BlockGibbsSpec,
-    SamplingSchedule,
-    sample_single_block,
-    sample_states,
-)
+from thrml.block_sampling import BlockGibbsSpec, SamplingSchedule, sample_single_block, sample_states
 from thrml.factor import FactorSamplingProgram
 from thrml.models.discrete_ebm import (
     CategoricalEBMFactor,
@@ -28,11 +23,7 @@ from thrml.models.discrete_ebm import (
 from thrml.models.ebm import FactorizedEBM
 from thrml.pgm import AbstractNode, CategoricalNode, SpinNode
 
-from .utils import (
-    count_samples,
-    generate_all_states_binary,
-    sample_and_compare_distribution,
-)
+from .utils import count_samples, generate_all_states_binary, sample_and_compare_distribution
 
 
 class TestFactor(unittest.TestCase):

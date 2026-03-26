@@ -1,13 +1,4 @@
-from typing import (
-    Generic,
-    Iterator,
-    Mapping,
-    Optional,
-    Sequence,
-    Type,
-    TypeAlias,
-    TypeVar,
-)
+from typing import Generic, Iterator, Mapping, Optional, Sequence, Type, TypeAlias, TypeVar
 
 import equinox as eqx
 import jax

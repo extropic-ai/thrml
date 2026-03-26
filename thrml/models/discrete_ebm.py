@@ -9,10 +9,7 @@ from jaxtyping import Array, Key, PyTree
 
 from thrml.block_management import Block, BlockSpec, from_global_state
 from thrml.block_sampling import _State
-from thrml.conditional_samplers import (
-    BernoulliConditional,
-    SoftmaxConditional,
-)
+from thrml.conditional_samplers import BernoulliConditional, SoftmaxConditional
 from thrml.factor import WeightedFactor
 from thrml.interaction import InteractionGroup
 from thrml.models.ebm import EBMFactor
@@ -352,7 +349,8 @@ class CategoricalGibbsConditional(SoftmaxConditional):
     """A conditional update for categorical random variables that will perform a Gibbs sampling update given one or
         more `DiscreteEBMInteractions`.
 
-    This function can be extended to handle other interactions in the same way as [`thrml.models.SpinGibbsConditional`][].
+    This function can be extended to handle other interactions in the same way as
+    [`thrml.models.SpinGibbsConditional`][].
 
     **Attributes:**
 
