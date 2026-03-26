@@ -66,8 +66,6 @@ line-length = 120
 [tool.pyright]
 reportUnnecessaryTypeIgnoreComment = true
 include = ["thrml"]
-venvPath = "."
-venv = "venv"
 
 [tool.pytest.ini_options]
 markers = [
