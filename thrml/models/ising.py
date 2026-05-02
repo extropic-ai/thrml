@@ -258,19 +258,33 @@ def estimate_kl_grad(
         the weight gradients and the bias gradients
     """
 
+    float_type = training_spec.ebm.beta.dtype
     key_pos, key_neg = jax.random.split(key, 2)
 
     cond_batched_pos = jax.tree.map(lambda x: jnp.broadcast_to(x, (data[0].shape[0], *x.shape)), conditioning_values)
 
-    keys_pos = jax.random.split(key_pos, init_state_positive[0].shape[:2])
+    if len(init_state_positive) == 0:
+        # if there are no initial states in pos sampling
+        # data[0]: (batch, n_nodes)
+        spins = 2 * data[0].astype(float_type) - 1  # (batch, n_nodes)
 
-    moms_b_pos, moms_w_pos = jax.vmap(
-        lambda k_out, i_out: jax.vmap(
-            lambda k, i, c: estimate_moments(
-                k, bias_nodes, weight_edges, training_spec.program_positive, training_spec.schedule_positive, i, c
-            )
-        )(k_out, i_out, data + cond_batched_pos)
-    )(keys_pos, init_state_positive)
+        ei_idx = jnp.array([bias_nodes.index(e[0]) for e in weight_edges])  # (n_edges,)
+        ej_idx = jnp.array([bias_nodes.index(e[1]) for e in weight_edges])  # (n_edges,)
+
+        moms_b_pos = spins  # (batch, n_nodes)
+        moms_w_pos = spins[:, ei_idx] * spins[:, ej_idx]  # (batch, n_edges)
+
+        moms_b_pos = moms_b_pos[None]  # (1, batch, n_nodes)
+        moms_w_pos = moms_w_pos[None]  # (1, batch, n_edges)
+    else:
+        keys_pos = jax.random.split(key_pos, init_state_positive[0].shape[:2])
+        moms_b_pos, moms_w_pos = jax.vmap(
+            lambda k_out, i_out: jax.vmap(
+                lambda k, i, c: estimate_moments(
+                    k, bias_nodes, weight_edges, training_spec.program_positive, training_spec.schedule_positive, i, c
+                )
+            )(k_out, i_out, data + cond_batched_pos)
+        )(keys_pos, init_state_positive)
 
     keys_neg = jax.random.split(key_neg, init_state_negative[0].shape[0])
 
@@ -286,7 +300,6 @@ def estimate_kl_grad(
         )
     )(keys_neg, init_state_negative)
 
-    float_type = training_spec.ebm.beta.dtype
     grad_b = -training_spec.ebm.beta * (
         jnp.mean(moms_b_pos, axis=(0, 1), dtype=float_type) - jnp.mean(moms_b_neg, axis=0, dtype=float_type)
     )
