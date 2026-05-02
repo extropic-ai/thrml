@@ -2,6 +2,7 @@ import unittest
 
 import equinox as eqx
 import jax
+import networkx as nx
 from jax import numpy as jnp
 
 from thrml.block_management import Block
@@ -204,11 +205,9 @@ class TestEstimateKLGrad(unittest.TestCase):
 
 
 class TestEstimateKLGradFullyVisible(unittest.TestCase):
-    """Test that estimate_kl_grad works when all nodes are visible (no latent variables)."""
+    """Test that estimate_kl_grad works when all nodes are visible."""
 
     def test_fully_visible_ising(self):
-        import networkx as nx
-
         key = jax.random.key(0)
 
         G = nx.grid_2d_graph(4, 4)
@@ -247,7 +246,7 @@ class TestEstimateKLGradFullyVisible(unittest.TestCase):
         init_free = hinton_init(subkey, model, free_blocks, (batch_size,))
 
         key, subkey = jax.random.split(key)
-        grad_w, grad_b, _, _ = estimate_kl_grad(
+        grad_w, grad_b, (moms_b_pos, _), _ = estimate_kl_grad(
             subkey,
             training_spec,
             nodes,
@@ -263,3 +262,7 @@ class TestEstimateKLGradFullyVisible(unittest.TestCase):
         self.assertEqual(grad_b.shape, (16,))
         self.assertTrue(jnp.all(jnp.isfinite(grad_w)))
         self.assertTrue(jnp.all(jnp.isfinite(grad_b)))
+
+        # Positive-phase bias moments should be exactly the data spins (no sampling occurs)
+        expected_spins = 2 * data.astype(moms_b_pos.dtype) - 1
+        self.assertTrue(jnp.allclose(moms_b_pos[0], expected_spins))
