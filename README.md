@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/_static/logo/logo.svg" alt="THRML Logo" width="150" style="margin-bottom: 10px;">
+  <img src="docs_site/brand/logo.svg" alt="THRML Logo" width="150" style="margin-bottom: 10px;">
 </div>
 
 <h1 align='center'>THRML</h1>
