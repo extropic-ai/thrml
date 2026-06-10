@@ -1,0 +1,222 @@
+"""Paths, URLs, and pure-data configuration for the THRML docs build."""
+
+import re
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent.parent
+NB_DIR = ROOT.parent / "examples"
+OUT_DIR = ROOT / "rendered"
+BRAND_DIR = ROOT / "brand"
+# Committed static files (e.g. the codon-optimization paper page and its figures)
+# copied verbatim into rendered/ at build time so rendered/ stays fully derived.
+STATIC_DIR = ROOT / "static"
+
+INDEX_GITHUB = "https://github.com/extropic-ai/thrml"
+
+# Brand fonts and the hero/footer videos are licensed assets served from a CDN,
+# not committed to this public repo. Repoint ASSET_BASE at your preferred host.
+ASSET_BASE = "https://thrml-docs.vercel.app"
+
+
+# The THRML mark (Extropic brand). The source is monochrome; recoloring its fill
+# to currentColor lets it inherit text color and shimmer on hover like the rest
+# of the chrome, exactly as the dot-triangle mark did.
+def _load_logo():
+    raw = (BRAND_DIR / "logo.svg").read_text(encoding="utf-8")
+    # Drop inline style fills (they pin a fixed grey and win over the presentation
+    # attribute), then recolor to currentColor so the mark inherits text color and
+    # shimmers on hover like the rest of the chrome.
+    raw = re.sub(r'\s*style="[^"]*"', "", raw)
+    raw = re.sub(r'fill="#[0-9A-Fa-f]{6}"', 'fill="currentColor"', raw)
+    raw = re.sub(r"<svg\b", '<svg class="thrml-logo" aria-hidden="true"', raw, count=1)
+    raw = re.sub(r'\s(width|height)="\d+"', "", raw)
+    return raw.strip()
+
+
+LOGO_SVG = _load_logo()
+
+# "assets" (not "figures") because a global .gitignore rule ignores figures/ dirs
+# used for the notebook-local paper outputs; these externalized PNGs must be tracked.
+FIG_DIR = OUT_DIR / "assets"
+
+INDEX_BLURBS = {
+    "00": "What a probabilistic computer is, how Extropic's sampling hardware works, and a first model sampled with THRML.",
+    "01": "The whole library end to end: nodes and blocks, factors and interaction groups, programs, and block Gibbs sampling.",
+    "02": "Ising and spin energy-based models built from scratch, then scaled to measure block-Gibbs throughput on 8 B200s.",
+    "03": "A real design problem end to end: optimize a gene's codons by writing the objective as an energy function, building it as a Potts model and an equivalent Ising model, and sampling with simulated annealing.",
+}
+
+INDEX_SECTIONS = [
+    (
+        "Tutorials",
+        "From a first Ising chain to the full sampling stack and hardware-scale spin models.",
+        ["00", "01", "02"],
+    ),
+    ("Applications", "Real problems compiled to graphical models and sampled on thermodynamic hardware.", ["03"]),
+]
+
+MATHJAX = (
+    "<script>window.MathJax = { tex: { "
+    "inlineMath: [['$', '$'], ['\\\\(', '\\\\)']], "
+    "displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']], "
+    "processEscapes: true }, "
+    "svg: { fontCache: 'global' } };</script>\n"
+    '<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" id="MathJax-script" async></script>'
+)
+
+# Prerender hint shared by the landing page and the notebook/docs chrome. The
+# rule is defined in one place here; SPECULATION_RULES is the block the chrome
+# injects, and SPECULATION_RULES_INLINE is the single-line form the landing
+# page's <head> carries alongside its other inline head fragments.
+_SPECULATION_JSON = '{ "prerender": [{ "where": { "href_matches": "/*" }, "eagerness": "moderate" }] }'
+SPECULATION_RULES = '<script type="speculationrules">\n' + _SPECULATION_JSON + "\n</script>\n"
+SPECULATION_RULES_INLINE = '<script type="speculationrules">' + _SPECULATION_JSON + "</script>\n"
+
+# API reference, generated from the installed thrml package and grouped the way
+# the library's own mkdocs nav groups it. Each category names the module its
+# symbols live on ("thrml" or "thrml.models") and the sidebar group it sits under.
+API_CATEGORIES = [
+    {
+        "label": "Graphical model components",
+        "slug": "api-pgm",
+        "module": "thrml",
+        "group": "Core",
+        "blurb": "Nodes are the variables of a graphical model. A node carries the type and shape of one site's state.",
+        "symbols": ["AbstractNode", "SpinNode", "CategoricalNode"],
+    },
+    {
+        "label": "Block management",
+        "slug": "api-blocks",
+        "module": "thrml",
+        "group": "Core",
+        "blurb": "A block is an ordered collection of nodes of the same type, the unit that block Gibbs updates in parallel. These tools build blocks and map between block state and the packed global state.",
+        "symbols": [
+            "Block",
+            "BlockSpec",
+            "block_state_to_global",
+            "from_global_state",
+            "get_node_locations",
+            "make_empty_block_state",
+            "verify_block_state",
+        ],
+    },
+    {
+        "label": "Factors",
+        "slug": "api-factors",
+        "module": "thrml",
+        "group": "Core",
+        "blurb": "Factors organize the interactions between variables and synthesize them into interaction groups. A FactorSamplingProgram wraps a set of factors into a runnable sampler.",
+        "symbols": ["AbstractFactor", "WeightedFactor", "FactorSamplingProgram"],
+    },
+    {
+        "label": "Interaction groups",
+        "slug": "api-interaction",
+        "module": "thrml",
+        "group": "Core",
+        "blurb": "An interaction group is the compiled, array-friendly form of a factor's interactions, ready for block Gibbs.",
+        "symbols": ["InteractionGroup"],
+    },
+    {
+        "label": "Conditional samplers",
+        "slug": "api-samplers",
+        "module": "thrml",
+        "group": "Core",
+        "blurb": "Conditional samplers draw a block's new state given its neighbors. They are the per-block kernels that block Gibbs strings together.",
+        "symbols": [
+            "AbstractConditionalSampler",
+            "AbstractParametricConditionalSampler",
+            "BernoulliConditional",
+            "SoftmaxConditional",
+        ],
+    },
+    {
+        "label": "Block sampling",
+        "slug": "api-block-sampling",
+        "module": "thrml",
+        "group": "Core",
+        "blurb": "The sampling engine: schedules, programs, and the entry points that run block Gibbs and read states back.",
+        "symbols": [
+            "SamplingSchedule",
+            "BlockGibbsSpec",
+            "BlockSamplingProgram",
+            "sample_states",
+            "sample_blocks",
+            "sample_single_block",
+            "sample_with_observation",
+        ],
+    },
+    {
+        "label": "Sampling observers",
+        "slug": "api-observers",
+        "module": "thrml",
+        "group": "Core",
+        "blurb": "Observers accumulate statistics over a chain as it runs, so you read off moments or stored states without materializing every sample.",
+        "symbols": ["AbstractObserver", "StateObserver", "MomentAccumulatorObserver"],
+    },
+    {
+        "label": "Energy-based models",
+        "slug": "api-ebm",
+        "module": "thrml.models",
+        "group": "Models",
+        "blurb": "Energy-based models define a distribution through an energy function. THRML factorizes that energy so block Gibbs can sample it.",
+        "symbols": ["AbstractEBM", "AbstractFactorizedEBM", "FactorizedEBM", "EBMFactor"],
+    },
+    {
+        "label": "Discrete energy-based models",
+        "slug": "api-discrete-ebm",
+        "module": "thrml.models",
+        "group": "Models",
+        "blurb": "Discrete EBM building blocks for spin and categorical variables, with square-tensor specializations and their matching Gibbs conditionals.",
+        "symbols": [
+            "DiscreteEBMFactor",
+            "DiscreteEBMInteraction",
+            "SquareDiscreteEBMFactor",
+            "SpinEBMFactor",
+            "CategoricalEBMFactor",
+            "SquareCategoricalEBMFactor",
+            "SpinGibbsConditional",
+            "CategoricalGibbsConditional",
+        ],
+    },
+    {
+        "label": "Ising models",
+        "slug": "api-ising",
+        "module": "thrml.models",
+        "group": "Models",
+        "blurb": "A ready-made Ising energy-based model, its sampling program, and the utilities to initialize, train, and estimate its moments.",
+        "symbols": [
+            "IsingEBM",
+            "IsingSamplingProgram",
+            "IsingTrainingSpec",
+            "hinton_init",
+            "estimate_moments",
+            "estimate_kl_grad",
+        ],
+    },
+]
+
+# Map each public API symbol to its reference page anchor, so notebook prose can
+# link class and function names straight to the API reference.
+API_SYMBOL_URL = {name: f"{cat['slug']}.html#{name}" for cat in API_CATEGORIES for name in cat["symbols"]}
+_API_XREF_RE = re.compile(
+    r"<code>(" + "|".join(re.escape(n) for n in sorted(API_SYMBOL_URL, key=len, reverse=True)) + r")</code>"
+)
+# Whole-token matcher for linking type names that appear as plain text (API
+# signatures, docstring prose). Longest-first so BlockSpec wins over Block, and
+# \b keeps Block from matching inside BlockSpec.
+_API_TOKEN_RE = re.compile(
+    r"\b(" + "|".join(re.escape(n) for n in sorted(API_SYMBOL_URL, key=len, reverse=True)) + r")\b"
+)
+
+# Normalize stray http links in the source notebooks at render time so the .ipynb
+# files stay pristine.
+_LINK_FIXES = {
+    'href="http://arxiv.org/': 'href="https://arxiv.org/',
+}
+
+
+# Notebooks present in the repo but kept off the published site for now.
+SKIP_RENDER = set()
+
+
+SITE_URL = "https://docs.thrml.ai"

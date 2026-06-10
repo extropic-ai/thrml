@@ -1,16 +1,16 @@
 version: 2
 
 build:
-  os: ubuntu-22.04
+  os: ubuntu-24.04
   tools:
     python: "3.11"
-
-mkdocs:
-  configuration: mkdocs.yml
-
-python:
-  install:
-    - method: pip
-      path: .
-      extra_requirements:
-        - docs
+  commands:
+    # Editable install so render_html.py can introspect the live thrml package
+    # for the API reference (also installs nbformat/nbconvert via the docs extra).
+    - pip install -e .[docs]
+    # Build the themed HTML (notebooks, prose pages, API reference, index,
+    # llms.txt) into docs_site/rendered/.
+    - python docs_site/scripts/render_html.py
+    # Publish the rendered site, including the brand fonts copied in at build time.
+    - mkdir -p "$READTHEDOCS_OUTPUT/html"
+    - cp -r docs_site/rendered/. "$READTHEDOCS_OUTPUT/html/"

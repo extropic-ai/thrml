@@ -1,0 +1,5 @@
+# Everything under rendered/ is build output of scripts/render_html.py.
+# The committed-static inputs (brand fonts) live in ../brand and are copied
+# here at build time, so the whole directory is generated and ignored.
+*
+!.gitignore
