@@ -43,15 +43,8 @@ development = [
     "black[jupyter]==25.1.0"
 ]
 docs = [
-  "hippogriffe==0.2.0",
-  "griffe==1.7.3",
-  "mkdocs==1.6.1",
-  "mkdocs-include-exclude-files==0.1.0",
-  "mkdocs-ipynb==0.1.0",
-  "mkdocs-material==9.6.7",
-  "mkdocstrings[python]==0.28.3",
-  "pygments<2.20",
-  "pymdown-extensions==10.14.3"
+  "nbformat>=5.9",
+  "nbconvert>=7.0"
 ]
 
 [tool.setuptools]
