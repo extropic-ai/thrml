@@ -2,4 +2,9 @@
 max-line-length = 120
 select = E, F
 ignore = E203, E402, E721, E731, E741, F722
-per-file-ignores = **/__init__.py:F401
+# docs_site is the docs renderer; its page builders hold long HTML/prose string
+# literals that cannot be wrapped without changing the rendered output, so E501
+# is ignored there.
+per-file-ignores =
+    **/__init__.py:F401
+    docs_site/*:E501

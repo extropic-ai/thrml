@@ -1,0 +1,193 @@
+@font-face { font-family: "Kessler Display W"; src: url(ASSET_BASE/fonts/kessler-display-italic.woff2) format("woff2"); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: "Rephlex Trial"; src: url(ASSET_BASE/fonts/rephlex-regular.woff2) format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Suisse BP Int'l"; src: url(ASSET_BASE/fonts/suisse-intl-regular.woff2) format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Suisse BP Int'l"; src: url(ASSET_BASE/fonts/suisse-intl-medium.woff2) format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "Suisse BP Int'l"; src: url(ASSET_BASE/fonts/suisse-intl-bold.woff2) format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Suisse Int'l Mono"; src: url(ASSET_BASE/fonts/suisse-mono-regular.woff2) format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Suisse Int'l Mono"; src: url(ASSET_BASE/fonts/suisse-mono-bold.woff2) format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+:root {
+  --black:#000; --copper:#903001; --orange:#ff8400; --gold:#f5d64c; --deep-brown:#1c0101; --solar:#fff1c8;
+  --muted:#a79073; --body:#ead7be; --hair:rgba(243,236,224,.09); --rule:rgba(255,132,0,.30);
+  --mono: "Suisse Int'l Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --display: "Kessler Display W", Georgia, "Times New Roman", serif;
+  --body-sans: "Suisse BP Int'l", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  --wordmark: "Rephlex Trial", "Suisse BP Int'l", Arial, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 5rem; }
+html, body { margin: 0; background: var(--black); }
+body { font-family: var(--mono); color: var(--body); -webkit-font-smoothing: antialiased; overflow-x: hidden; line-height: 1.6; }
+body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(820px 520px at 84% -8%, rgba(144,48,1,.16), transparent 60%),
+    radial-gradient(620px 520px at -8% 98%, rgba(78,1,42,.18), transparent 60%),
+    #000; }
+a { color: var(--gold); text-decoration: none; }
+
+.nav { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; justify-content: space-between;
+  padding: 17px 32px; background: rgba(0,0,0,.5); backdrop-filter: blur(10px); border-bottom: 1px solid var(--hair); }
+.brand { display: inline-flex; align-items: center; gap: 12px; color: var(--solar); }
+.brand .thrml-logo { width: auto; height: 25px; flex-shrink: 0; color: var(--solar);
+  transition: color .2s ease, filter .2s ease; }
+.brand:hover .thrml-logo { animation: thrmlShimmer 1.2s ease-in-out infinite; }
+.brand-name { font-family: var(--wordmark); font-size: 17px; letter-spacing: 0.12em; color: var(--solar); }
+@keyframes thrmlShimmer {
+  0%, 100% { color: #FFF1C8; filter: drop-shadow(0 0 0 rgba(245,214,76,0)); }
+  35% { color: #F5D64C; filter: drop-shadow(0 0 7px rgba(245,214,76,.7)); }
+  70% { color: #FF8400; filter: drop-shadow(0 0 9px rgba(255,132,0,.5)); }
+}
+.pills { display: flex; gap: 8px; }
+.pill { display: inline-flex; align-items: center; gap: .45em; background: transparent; border: 1px solid var(--rule);
+  color: var(--solar); font-family: var(--mono); font-size: 11px; letter-spacing: .01em; padding: 8px 16px;
+  border-radius: 2px; text-transform: uppercase; transition: background .18s, border-color .18s; }
+.pill:hover { background: rgba(255,132,0,.1); border-color: var(--orange); }
+.pill:active { transform: scale(.98); }
+.pill.solid { background: var(--orange); border-color: var(--orange); color: #120b04; font-weight: 600; }
+.pill.solid:hover { background: #ff9a30; }
+@media (max-width: 560px) {
+  .nav { padding: 12px 14px; }
+  .brand { gap: 8px; }
+  .brand .thrml-logo { height: 21px; }
+  .brand-name { font-size: 13px; letter-spacing: .08em; }
+  .pills { gap: 5px; }
+  .pill { padding: 6px 8px; font-size: 9.5px; letter-spacing: 0; gap: .3em; }
+  /* Tighter gutters + a heading that always fits the long word THERMODYNAMIC. */
+  .hero { padding: 4.2rem 1.2rem 3.5rem; }
+  .hero h1 { font-size: clamp(26px, 8vw, 46px); margin-bottom: 1.2rem; }
+  .hero .tagline { font-size: .95rem; }
+  .prims { padding: 2.4rem 1.2rem 0; gap: 1.4rem; }
+  .quick { padding: 0 1.2rem; }
+  .nb-wrap { padding-left: 1.2rem; padding-right: 1.2rem; }
+  .foot-inner { padding-left: 1.2rem; padding-right: 1.2rem; }
+  /* Cards in a single column so they never exceed the viewport. */
+  .grid, .apps-grid { grid-template-columns: 1fr; }
+  .sec-title { font-size: clamp(26px, 7vw, 40px); }
+}
+/* On the narrowest phones, drop the wordmark text so the logo + all three nav pills fit. */
+@media (max-width: 380px) {
+  .brand-name { display: none; }
+  .pill { padding: 6px 7px; }
+}
+
+/* hero */
+.hero { max-width: 78rem; margin: 0 auto; padding: 7rem 2rem 5.5rem;
+  display: grid; grid-template-columns: 1.18fr .82fr; gap: 2.5rem; align-items: center; }
+.hero-text { min-width: 0; }
+.hero-eyebrow { margin: 0 0 1.6rem; }
+.hero-eyebrow img { display: block; height: 14px; width: auto; opacity: .8; }
+.hero-kicker { display: inline-block; font-family: var(--mono); font-size: 11px; letter-spacing: .22em;
+  text-transform: uppercase; color: var(--orange); padding-bottom: .6rem;
+  border-bottom: 1px solid var(--rule); }
+.hero h1 { font-family: var(--display); margin: 0 0 1.6rem;
+  font-size: clamp(44px, 6vw, 84px); font-weight: 500; line-height: .92;
+  letter-spacing: -0.04em; text-transform: uppercase;
+  /* The fill is painted with background-clip:text. On Safari the italic last glyph
+     (the C in THERMODYNAMIC) can overhang the paint box and render unfilled when the
+     word fills its column. A little right padding extends the paint box past the ink;
+     the matching negative margin keeps layout unchanged. */
+  box-sizing: content-box; padding-right: 0.22em; margin-right: -0.22em;
+  background: linear-gradient(105deg, #fff1c8 0 38%, #f5d64c 46%, #fffdf5 50%, #f5d64c 54%, #fff1c8 62% 100%);
+  background-size: 260% 100%; -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+  animation: heroGleam 8.5s ease-in-out infinite; }
+@keyframes heroGleam { 0% { background-position: 165% 50%; } 55%, 100% { background-position: -65% 50%; } }
+.hero .tagline { color: var(--body); font-size: 1rem; line-height: 1.85; max-width: 29rem; margin: 0 0 2.3rem; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; }
+
+.hero-visual { display: flex; justify-content: center; align-items: center; }
+.hero-media { width: 100%; max-width: 31rem; }
+/* Extropic brand animation (the X dot-matrix), used as the hero visual. The video sits on
+   black, so a soft radial mask blends its edges into the page. */
+.hero-video { display: block; width: 100%; height: 23rem; object-fit: contain;
+  -webkit-mask-image: radial-gradient(ellipse 78% 82% at 50% 50%, #000 55%, transparent 100%);
+  mask-image: radial-gradient(ellipse 78% 82% at 50% 50%, #000 55%, transparent 100%); }
+@media (max-width: 860px) { .hero-video { height: 16rem; } }
+@media (max-width: 860px) {
+  .hero { grid-template-columns: 1fr; gap: 2rem; padding-top: 4.5rem; }
+  .hero-visual { order: 2; }
+}
+
+/* primitives: flat, borderless */
+.prims { max-width: 68rem; margin: 0 auto; padding: 2.6rem 2rem 0; display: grid;
+  grid-template-columns: repeat(3, 1fr); gap: 2.6rem; border-top: 1px solid var(--hair); }
+@media (max-width: 720px) { .prims { grid-template-columns: 1fr; gap: 1.7rem; } }
+.prim .name { color: var(--gold); font-size: 1rem; letter-spacing: -0.01em; }
+.prim .dom { color: var(--muted); font-size: .78rem; margin-left: .5rem; }
+.prim .desc { color: var(--muted); font-size: .85rem; margin-top: .6rem; line-height: 1.65; }
+
+/* section heading */
+.sec-title { font-family: var(--display); color: var(--solar); font-size: clamp(32px, 4vw, 48px); font-weight: 500;
+  letter-spacing: -0.04em; line-height: .95; text-transform: uppercase; margin: 0; display: inline-flex; align-items: center; gap: .65em; }
+.sec-title::before { content: ""; width: 22px; height: 2px; background: var(--orange); display: inline-block; }
+.sec-sub { color: var(--muted); font-size: .85rem; margin: .8rem 0 1.7rem; }
+
+/* quickstart: single clean column */
+.quick { max-width: 48rem; margin: 6.5rem auto 0; padding: 0 2rem; }
+.quick .install { color: var(--muted); font-size: .9rem; margin: 1.3rem 0 1.1rem; }
+.quick .install code { color: var(--orange); background: rgba(255,132,0,.1); border-radius: 2px; padding: .16em .5em; }
+.codecard { position: relative; background: #0c0a08; border: 1px solid var(--copper); border-radius: 2px; overflow: hidden; }
+.codecard .chead { display: flex; justify-content: space-between; align-items: center;
+  padding: .55rem .95rem .2rem; font-size: 11px; color: var(--muted); letter-spacing: .01em; }
+.codecard .copy { background: none; border: 0; padding: 2px 3px; margin: 0; cursor: pointer; color: var(--muted);
+  display: inline-flex; align-items: center; gap: .4em; border-radius: 2px; font-family: var(--mono);
+  font-size: 10px; letter-spacing: .01em; text-transform: uppercase; transition: color .12s; }
+.codecard .copy:hover { color: var(--orange); }
+.codecard .copy.done { color: var(--gold); }
+.codecard pre { margin: 0; padding: .35rem 1.1rem 1rem; overflow-x: auto; color: var(--body);
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.78; }
+.codecard pre .cmt { color: #9a7a52; font-style: italic; }
+.codecard pre .out { color: var(--muted); }
+
+/* examples: flat hairline cards */
+.nb-wrap { max-width: 68rem; margin: 0 auto; padding: 6.5rem 2rem 1rem; }
+.sec { margin-top: 4rem; }
+.sec:first-child { margin-top: 1rem; }
+/* min(..., 100%) keeps a track from ever exceeding the viewport on narrow phones. */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(255px, 100%), 1fr)); gap: 1.4rem; }
+/* A small grid (one or two cards) sized deliberately so it never orphans against a full-width heading. */
+.apps-grid { grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 30rem)); justify-content: start; }
+.apps-links { display: flex; flex-wrap: wrap; gap: 1.8rem; margin-top: 1.9rem; }
+.apps-links .browse { margin-top: 0; }
+.card { display: flex; flex-direction: column; padding: 1.35rem 1.4rem; border: 1px solid var(--copper);
+  border-radius: 2px; background: transparent; transition: border-color .16s, background .16s; }
+.card:hover { border-color: rgba(255,132,0,.42); background: rgba(255,132,0,.025); }
+.card-num { color: var(--orange); font-size: .72rem; letter-spacing: -0.01em; }
+.card-title { font-family: var(--display); color: var(--solar); font-weight: 500; font-size: 1.12rem;
+  margin: .5rem 0 .55rem; line-height: 1.25; }
+.card-blurb { color: var(--muted); font-size: .82rem; line-height: 1.62; }
+.browse { display: inline-flex; align-items: center; gap: .5em; margin-top: 1.9rem; color: var(--orange);
+  font-size: .82rem; letter-spacing: .01em; text-transform: uppercase; transition: gap .16s ease, color .16s ease; }
+.browse:hover { gap: .85em; color: var(--solar); }
+
+/* subtle scroll-in motion */
+.reveal { opacity: 0; transform: translateY(16px); transition: opacity .7s ease, transform .7s ease; }
+.reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .hero h1 { animation: none; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+}
+
+.foot { margin-top: 7rem; }
+.foot-video { display: block; width: 100%; height: clamp(100px, 15vw, 190px); object-fit: cover;
+  opacity: .85; border-top: 1px solid var(--hair); }
+.foot-inner { max-width: 68rem; margin: 0 auto; padding: 1.8rem 2rem 3rem; display: flex; flex-wrap: wrap;
+  align-items: center; justify-content: space-between; gap: 1rem; color: var(--muted); font-size: .78rem;
+  letter-spacing: .01em; text-transform: uppercase; }
+.foot-inner a { color: var(--orange); }
+.foot-inner a:hover { color: var(--solar); }
+
+/* ---- Mobile overrides (placed last so they win source order) ---- */
+@media (max-width: 560px) {
+  /* The heading must fit the long word THERMODYNAMIC at 300px without clipping. */
+  .hero { padding: 4.2rem 1.1rem 3.2rem; }
+  .hero h1 { font-size: clamp(23px, 7.6vw, 44px); line-height: .96; margin-bottom: 1.1rem; letter-spacing: -0.045em; }
+  .hero .tagline { font-size: .95rem; }
+  .prims { padding: 2.4rem 1.1rem 0; }
+  .quick { padding: 0 1.1rem; }
+  .nb-wrap { padding-left: 1.1rem; padding-right: 1.1rem; }
+  .quick .sec-title, .nb-wrap .sec-title { font-size: clamp(24px, 7vw, 40px); }
+}
+@media (max-width: 360px) {
+  .hero h1 { font-size: 22px; }
+}

@@ -1,0 +1,378 @@
+/* ---- Extropic brand, warm dark theme (overrides the lab template) ----
+   Self-hosted brand fonts: Kessler Display (display serif, italic) for headings,
+   Suisse BP Int'l for body, Suisse Int'l Mono for code/UI, Rephlex for the wordmark. */
+@font-face { font-family: "Kessler Display W"; src: url(ASSET_BASE/fonts/kessler-display-italic.woff2) format("woff2"); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: "Rephlex Trial"; src: url(ASSET_BASE/fonts/rephlex-regular.woff2) format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Suisse BP Int'l"; src: url(ASSET_BASE/fonts/suisse-intl-regular.woff2) format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Suisse BP Int'l"; src: url(ASSET_BASE/fonts/suisse-intl-medium.woff2) format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "Suisse BP Int'l"; src: url(ASSET_BASE/fonts/suisse-intl-bold.woff2) format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Suisse Int'l Mono"; src: url(ASSET_BASE/fonts/suisse-mono-regular.woff2) format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Suisse Int'l Mono"; src: url(ASSET_BASE/fonts/suisse-mono-bold.woff2) format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+:root {
+  --ex-orange: #FF8400; --ex-gold: #F5D64C; --ex-accent: #FF8400; --ex-copper: #903001; --ex-amber: #F0B86E; --ex-tan: #DCAE72;
+  --ex-page: #0B0B0C; --ex-code-bg: #131211; --ex-code-border: #2C2926; --ex-frame: rgba(243,236,224,.11);
+  --ex-ink: #D4CDC2; --ex-cream: #F2ECE1; --ex-muted: #8C8377; --ex-rule: #221F1C;
+  --ex-math: #EAA84F;
+  --ex-display: "Kessler Display W", Georgia, "Times New Roman", serif;
+  --ex-subhead: "Suisse BP Int'l", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  /* Re-point JupyterLab template variables at the dark brand */
+  --jp-layout-color0: var(--ex-page); --jp-layout-color1: var(--ex-page);
+  --jp-layout-color2: #141312; --jp-layout-color3: #1B1A18;
+  --jp-content-font-color0: var(--ex-cream); --jp-content-font-color1: var(--ex-ink);
+  --jp-content-font-color2: #ABA092; --jp-content-font-color3: var(--ex-muted);
+  --jp-content-font-family: "Suisse BP Int'l", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+  --jp-content-font-size1: 16px;
+  --jp-content-line-height: 1.75;
+  --jp-content-link-color: var(--ex-accent);
+  --jp-cell-prompt-width: 0px;
+  --jp-code-font-family: "Suisse Int'l Mono", "SFMono-Regular", ui-monospace, Menlo, monospace;
+  --jp-code-font-size: 13px;
+  --jp-cell-editor-background: var(--ex-code-bg);
+  --jp-cell-editor-border-color: var(--ex-code-border);
+  --jp-border-color1: var(--ex-rule); --jp-border-color2: var(--ex-rule); --jp-border-color3: var(--ex-rule);
+}
+html, body { background: var(--ex-page); color: var(--ex-ink); }
+/* Center the content column, docs-style */
+/* Body is full width with the sidebar offset; <main> is the centered column,
+   exactly like the docs pages (.thrml-doc). */
+.jp-Notebook { max-width: none; margin: 0; padding: 0; background: var(--ex-page); }
+body.jp-Notebook > main { max-width: 50rem; margin: 0 auto; padding: 4.7rem 1.5rem 5rem; }
+/* Drop the In[ ]/Out[ ] prompt gutters and collapser bar (the classic-Jupyter tells) */
+.jp-InputArea-prompt, .jp-OutputArea-prompt, .jp-Collapser { display: none !important; }
+/* Flow cells like continuous doc prose: drop the lab-template cell padding and let
+   the prose element margins set the vertical rhythm (matches the docs pages). */
+.jp-Cell { padding: 0; margin: 0; }
+.jp-MarkdownCell { padding: 0; }
+.jp-MarkdownCell .jp-Cell-inputWrapper, .jp-MarkdownCell .jp-InputArea {
+  display: block; overflow: visible; width: 100%; }
+.jp-RenderedHTMLCommon p { margin: 0 0 1rem; }
+.jp-RenderedHTMLCommon ul, .jp-RenderedHTMLCommon ol { margin: 0 0 1rem; padding-left: 1.3rem; }
+.jp-RenderedHTMLCommon li { margin: .35rem 0; }
+/* Opening paragraph reads as a lede, like the docs pages. */
+body.jp-Notebook > main > .jp-MarkdownCell:first-child .jp-RenderedHTMLCommon > p:first-of-type {
+  color: var(--ex-cream); font-size: 1.12rem; line-height: 1.7; }
+/* API cross-reference links (API symbol names in prose -> API reference) */
+.jp-RenderedHTMLCommon a.api-xref { border-bottom: none; }
+.jp-RenderedHTMLCommon a.api-xref code { position: relative; background-color: rgba(255,132,0,.10);
+  white-space: nowrap; transition: background-color .18s; }
+.jp-RenderedHTMLCommon a.api-xref code::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0;
+  height: 2px; background: var(--ex-orange); transform: scaleX(0); transform-origin: left;
+  transition: transform .25s ease; }
+.jp-RenderedHTMLCommon a.api-xref:hover code { background-color: rgba(255,132,0,.20); }
+.jp-RenderedHTMLCommon a.api-xref:hover code::after { transform: scaleX(1); }
+/* Inline code and API links inside headings are part of the heading, not a boxed link. */
+.jp-RenderedHTMLCommon :is(h1,h2,h3,h4) code,
+.jp-RenderedHTMLCommon :is(h1,h2,h3,h4) a.api-xref code {
+  background: none; box-shadow: none; padding: 0; color: var(--ex-cream); font-size: .92em; white-space: normal; }
+.jp-RenderedHTMLCommon :is(h1,h2,h3,h4) a.api-xref code::after { display: none; }
+/* In tables, API names stay as quiet text links so cells read cleanly. */
+.jp-RenderedHTMLCommon table :not(pre) > code,
+.jp-RenderedHTMLCommon table a.api-xref code {
+  background: none; padding: 0 .15em 0 0; color: var(--ex-accent); white-space: normal; }
+.jp-RenderedHTMLCommon table a.api-xref code::after { display: none; }
+
+/* ---- Prose (matches the .thrml-doc rules on the docs pages) ---- */
+.jp-RenderedHTMLCommon { color: var(--ex-ink); font-family: var(--jp-content-font-family);
+  font-size: 16px; line-height: 1.75; padding-right: 0;
+  display: block; min-width: 0; max-width: 100%; overflow-wrap: break-word; }
+/* Keep notebook cells inside the content column: long code scrolls, long prose wraps. */
+.jp-Cell, .jp-InputArea, .jp-Cell-inputArea, .jp-OutputArea,
+.jp-CodeCell .jp-InputArea-editor { min-width: 0; max-width: 100%; }
+.jp-RenderedHTMLCommon pre, .jp-OutputArea pre { max-width: 100%; overflow-x: auto; }
+/* On phones, let long inline-code tokens (file names, identifiers) wrap so the page never scrolls sideways. */
+@media (max-width: 40rem) {
+  .jp-RenderedHTMLCommon :not(pre) > code, .jp-RenderedHTMLCommon a.api-xref code {
+    white-space: normal; overflow-wrap: anywhere; }
+}
+/* :first-child variants override nbconvert's heading first-child margins. */
+.jp-RenderedHTMLCommon h1, .jp-RenderedHTMLCommon h1:first-child {
+  font-family: var(--ex-display); font-weight: 500; color: var(--ex-cream);
+  text-transform: uppercase; letter-spacing: -0.04em; font-size: clamp(40px, 6vw, 48px); line-height: .95;
+  margin: 0 0 1.6rem; padding-bottom: .35rem; border-bottom: 3px solid var(--ex-accent); display: inline-block; }
+.jp-RenderedHTMLCommon h2, .jp-RenderedHTMLCommon h2:first-child {
+  font-family: var(--ex-display); font-weight: 500; font-size: clamp(28px, 4vw, 48px); line-height: 1.0;
+  letter-spacing: -0.04em; margin: 2.8rem 0 1.1rem; padding-bottom: .4rem; color: var(--ex-cream);
+  border-bottom: 1px solid var(--ex-frame); }
+.jp-RenderedHTMLCommon h3, .jp-RenderedHTMLCommon h3:first-child {
+  font-family: var(--ex-subhead); font-weight: 500; font-size: 1.25rem; line-height: 1.3;
+  letter-spacing: -0.01em; margin: 2rem 0 .7rem; color: var(--ex-cream); }
+.jp-RenderedHTMLCommon a { color: var(--ex-accent); text-decoration: none; }
+/* Prose links slide their underline in on hover, matching the api cross-reference links. */
+.jp-RenderedHTMLCommon a:not(.api-xref) {
+  background-image: linear-gradient(var(--ex-orange), var(--ex-orange));
+  background-size: 0% 1.5px; background-position: left bottom; background-repeat: no-repeat;
+  transition: background-size .25s ease, color .15s; }
+.jp-RenderedHTMLCommon a:not(.api-xref):hover { background-size: 100% 1.5px; }
+.jp-RenderedHTMLCommon strong { color: var(--ex-cream); }
+.jp-RenderedHTMLCommon hr { border: none; border-top: 1px solid var(--ex-rule); margin: 2.2rem 0; }
+.jp-RenderedHTMLCommon :not(pre) > code, .jp-RenderedMarkdown :not(pre) > code {
+  background: rgba(255,132,0,.12); color: var(--ex-accent); border-radius: 2px;
+  padding: .12em .42em; font-size: .9em; line-height: inherit; white-space: normal; }
+.jp-RenderedHTMLCommon blockquote { margin: 1.4rem 0; padding: .9rem 1.1rem;
+  background: var(--ex-code-bg); border: 1px solid var(--ex-copper); border-radius: 2px;
+  color: #C9C0B2; font-family: var(--jp-code-font-family); font-size: .9rem; }
+/* Callout box, mirroring the docs-page .note so notebook prose can use it too. */
+.jp-RenderedHTMLCommon .note { margin: 1.3rem 0; padding: .85rem 1.1rem; background: rgba(255,132,0,.05);
+  border: 1px solid var(--ex-frame); border-left: 3px solid var(--ex-copper); border-radius: 0 2px 2px 0; }
+.jp-RenderedHTMLCommon .note-t { display: block; font-family: var(--jp-code-font-family); font-size: .68rem;
+  letter-spacing: -0.01em; text-transform: uppercase; color: var(--ex-accent); margin-bottom: .4rem; }
+.jp-RenderedHTMLCommon .note p { margin: .4rem 0; font-size: .92rem; }
+.jp-RenderedHTMLCommon .note p:first-of-type { margin-top: 0; }
+.jp-RenderedHTMLCommon .note p:last-child { margin-bottom: 0; }
+
+/* ---- Code cells: framed dark card with a flat gold left bar ---- */
+.jp-CodeCell .jp-Cell-inputWrapper { position: relative; margin: 1.1rem 0 1.5rem; }
+/* the orange accent is the editor's border-left below; no separate bar */
+.jp-CodeCell .jp-InputArea, .jp-CodeCell .jp-Cell-inputArea { width: 100%; }
+.jp-CodeCell .jp-InputArea-editor { position: relative; z-index: 1; background: var(--ex-code-bg) !important;
+  border: 1px solid var(--ex-copper) !important; border-left: 3px solid var(--ex-accent) !important;
+  border-radius: 2px; overflow: hidden; }
+.jp-CodeCell .cm-editor, .jp-CodeCell .cm-editor.cm-s-jupyter, .jp-CodeCell .highlight {
+  background: transparent !important; }
+.jp-CodeCell .highlight pre { margin: 0; padding: .85rem 1.05rem 1rem; overflow-x: auto;
+  color: var(--ex-ink); line-height: 1.7; }
+/* Header bar: language chip + copy (shared by notebook cells and docs code cards) */
+.thrml-code-head { display: flex; align-items: center; justify-content: space-between;
+  padding: .6rem .9rem .1rem; font: 500 12px/1 var(--jp-code-font-family); }
+.thrml-code-head .thrml-lang { color: var(--ex-cream); font-weight: 600; letter-spacing: .01em; }
+.thrml-code-head .thrml-tools { display: flex; align-items: center; gap: .55rem; }
+.thrml-code-head .thrml-copy { background: none; border: 0; padding: 2px; margin: 0; cursor: pointer;
+  color: var(--ex-muted); display: inline-flex; border-radius: 2px; transition: color .12s; }
+.thrml-code-head .thrml-copy:hover { color: var(--ex-accent); }
+.thrml-code-head .thrml-copy.copied { color: var(--ex-gold); }
+.jp-CodeCell .highlight pre::-webkit-scrollbar { height: 9px; }
+.jp-CodeCell .highlight pre::-webkit-scrollbar-track { background: transparent; }
+.jp-CodeCell .highlight pre::-webkit-scrollbar-thumb { background: #3A352F; border-radius: 6px; }
+.jp-CodeCell .highlight pre::-webkit-scrollbar-thumb:hover { background: #4A443C; }
+
+/* ---- Syntax: warm monochrome ---- */
+.highlight .c, .highlight .c1, .highlight .cm, .highlight .cs { color: #A8845A; font-style: italic; }
+.highlight .k, .highlight .kn, .highlight .kc, .highlight .kd, .highlight .kr, .highlight .kp { color: #F59A45; font-weight: 500; }
+.highlight .o, .highlight .ow { color: #E89240; font-weight: 500; }
+.highlight .nb, .highlight .bp { color: #EAA45A; }
+.highlight .mi, .highlight .mf, .highlight .m, .highlight .mh, .highlight .mo, .highlight .il { color: #F0B86E; }
+.highlight .s, .highlight .s1, .highlight .s2, .highlight .sb, .highlight .sc, .highlight .sd, .highlight .se, .highlight .sh, .highlight .si, .highlight .sx { color: #D6B07A; }
+.highlight .sr { color: #D49A55; }
+.highlight .nf, .highlight .fm { color: #EFE3CF; }
+.highlight .nc, .highlight .nn { color: #F5D64C; }
+.highlight .nd, .highlight .ne { color: #F5D64C; }
+.highlight .nv, .highlight .vc, .highlight .vg, .highlight .vi { color: var(--ex-ink); }
+.highlight .p, .highlight .pi { color: #9C9384; }
+.highlight .err { color: #FF6B5B; background: transparent; }
+.highlight, .highlight pre, .highlight .n, .highlight .nx { color: var(--ex-ink); }
+
+/* ---- Outputs ---- */
+.jp-OutputArea-output { background: transparent; color: var(--ex-ink); }
+/* Matplotlib figures save on white; present them as deliberate framed cards
+   (centered, rounded, padded) so they read as intentional on the dark page. */
+/* Output figures fit the column (border-box keeps padding inside max-width so the
+   row never scrolls) and sit on a clean white card, not a beige one. */
+.jp-OutputArea, .jp-OutputArea-child, .jp-OutputArea-output { max-width: 100%; overflow: visible; }
+.jp-OutputArea-output img, .jp-RenderedImage img {
+  display: block; box-sizing: border-box; margin: 1.4rem auto 1.8rem;
+  max-width: 100%; width: auto; height: auto;
+  background: #ffffff; border-radius: 10px; padding: 12px;
+  box-shadow: 0 0 0 1px rgba(243,236,224,.10); }
+/* The roadmap "From codons to Ising spins" figure is the original orange/blue
+   designer figure (the two-category palette is semantically load-bearing) on white,
+   so present it as a clean white card. box-sizing:border-box keeps the padding inside
+   the column so the right edge never clips. */
+.jp-RenderedHTMLCommon img[src$="codon_pipeline.png"] {
+  display: block; box-sizing: border-box; max-width: 100%; height: auto;
+  margin-left: auto; margin-right: auto;
+  background: #ffffff !important; padding: 14px !important;
+  border-radius: 10px; box-shadow: 0 0 0 1px rgba(243,236,224,.10); }
+.jp-RenderedText pre, .jp-OutputArea-output pre { color: var(--ex-ink); background: transparent; }
+
+/* ---- Stream + error output: warm-dark "log/warning" blocks ----
+   The lab template paints stderr/error output on a default light-pink card
+   (--jp-rendermime-error-background). Override it to a quiet ember log block
+   so warnings/tracebacks read as intentional on the dark page. */
+.jp-RenderedText[data-mime-type="application/vnd.jupyter.stderr"],
+.jp-RenderedText[data-mime-type="application/vnd.jupyter.error"] {
+  background: rgba(255, 132, 0, .04) !important;
+  border: 1px solid var(--ex-frame);
+  border-left: 3px solid var(--ex-copper);
+  border-radius: 0 2px 2px 0;
+  padding: .7rem .95rem;
+  margin: .6rem 0; }
+.jp-RenderedText[data-mime-type="application/vnd.jupyter.stderr"] pre,
+.jp-RenderedText[data-mime-type="application/vnd.jupyter.error"] pre {
+  color: var(--ex-muted) !important;
+  background: transparent !important;
+  font-family: var(--jp-code-font-family);
+  font-size: 12.5px; line-height: 1.6;
+  margin: 0; white-space: pre-wrap; word-break: break-word; }
+/* Error tracebacks carry ANSI colors inline; keep the box but let the dim
+   ember text stand without the pink fill. */
+.jp-RenderedText[data-mime-type="application/vnd.jupyter.error"] {
+  border-left-color: var(--ex-orange); }
+/* Plain stdout / text-plain stream output: transparent, on-theme ink. */
+.jp-RenderedText[data-mime-type="text/plain"],
+.jp-RenderedText[data-mime-type="application/vnd.jupyter.stdout"] {
+  background: transparent !important; }
+.jp-RenderedText[data-mime-type="text/plain"] pre,
+.jp-RenderedText[data-mime-type="application/vnd.jupyter.stdout"] pre {
+  color: var(--ex-ink) !important; background: transparent !important; }
+
+.jp-RenderedHTMLCommon table.dataframe { color: var(--ex-ink); }
+.jp-RenderedHTMLCommon table.dataframe thead th, .jp-RenderedHTMLCommon table.dataframe tr,
+.jp-RenderedHTMLCommon table.dataframe td, .jp-RenderedHTMLCommon table.dataframe th { border-color: var(--ex-rule); }
+
+/* ---- Markdown content tables: dark theme, horizontal rules only ---- */
+.jp-RenderedHTMLCommon table:not(.tfo-notebook-buttons):not(.dataframe) {
+  border-collapse: collapse; width: 100%; margin: 1.6rem 0;
+  color: var(--ex-ink); font-size: .92rem; background: transparent; }
+.jp-RenderedHTMLCommon table:not(.tfo-notebook-buttons):not(.dataframe) thead th {
+  color: var(--ex-cream); font-weight: 600; text-align: left; white-space: nowrap;
+  padding: .55rem .85rem; background: transparent;
+  border: none; border-bottom: 2px solid var(--ex-accent); }
+.jp-RenderedHTMLCommon table:not(.tfo-notebook-buttons):not(.dataframe) td,
+.jp-RenderedHTMLCommon table:not(.tfo-notebook-buttons):not(.dataframe) tbody th {
+  color: var(--ex-ink); text-align: left; padding: .5rem .85rem; vertical-align: top;
+  border: none; border-bottom: 1px solid var(--ex-rule); }
+.jp-RenderedHTMLCommon table:not(.tfo-notebook-buttons):not(.dataframe) tbody tr { background: transparent; }
+.jp-RenderedHTMLCommon table:not(.tfo-notebook-buttons):not(.dataframe) tbody tr:nth-child(2n) {
+  background: rgba(243, 236, 224, .04); }
+.jp-RenderedHTMLCommon table:not(.tfo-notebook-buttons):not(.dataframe) tbody tr:hover {
+  background: rgba(255, 132, 0, .06); }
+
+/* ---- Header source/download buttons as warm dark pills ---- */
+table.tfo-notebook-buttons { float: none !important; display: block; border: none !important;
+  background: transparent !important; margin: .2rem 0 1.9rem; }
+table.tfo-notebook-buttons tbody, table.tfo-notebook-buttons tr {
+  background: transparent !important; border: none !important; box-shadow: none !important; }
+table.tfo-notebook-buttons td { display: inline-block; padding: 0 .5rem 0 0; border: none !important;
+  background: transparent !important; box-shadow: none !important; }
+table.tfo-notebook-buttons a { display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 550;
+  color: var(--ex-amber) !important; background: #161310 !important; background-image: none !important;
+  border: 1px solid var(--ex-copper) !important; border-radius: 2px;
+  padding: 7px 14px; text-decoration: none !important;
+  transition: background .14s ease, color .14s ease, border-color .14s ease; }
+table.tfo-notebook-buttons a:hover { background: var(--ex-accent) !important; color: #1C0101 !important;
+  border-color: var(--ex-accent) !important; }
+
+/* ---- Collapsed setup cells: pill toggle ---- */
+.celltag_hide-input > .jp-Cell-inputWrapper { display: none; }
+.celltag_hide-input.thrml-open > .jp-Cell-inputWrapper { display: block; }
+.thrml-toggle { display: inline-flex; align-items: center; gap: .45rem; letter-spacing: .01em;
+  font: 500 12px/1 var(--jp-code-font-family); color: var(--ex-amber);
+  background: var(--ex-code-bg); border: 1px solid var(--ex-copper); border-radius: 2px;
+  padding: 7px 12px 7px 10px; margin: .2rem 0 .7rem; cursor: pointer; user-select: none;
+  transition: color .12s, border-color .12s, background .12s; }
+.thrml-toggle:hover { color: var(--ex-accent); border-color: rgba(255,132,0,.5); background: #17140F; }
+.thrml-toggle .thrml-chev { display: inline-flex; transition: transform .15s; }
+.celltag_hide-input.thrml-open .thrml-toggle .thrml-chev { transform: rotate(90deg); }
+
+/* ---- Math ---- */
+.MathJax_CHTML, .mjx-chtml, .MathJax, .MathJax_CHTML *, .mjx-chtml *, .MathJax *,
+mjx-container, mjx-container * { color: var(--ex-math) !important; }
+mjx-container svg, mjx-container svg * { fill: var(--ex-math) !important; }
+.MJXc-display, mjx-container[display="true"] { margin: 1.5rem 0 !important; padding: .2rem 0 .3rem 1.1rem;
+  overflow: visible; text-align: left !important; background: none; border: 0; }
+.MJXc-display, .MJXc-display *,
+mjx-container[display="true"], mjx-container[display="true"] * { color: var(--ex-cream) !important; }
+mjx-container[display="true"] svg, mjx-container[display="true"] svg * { fill: var(--ex-cream) !important; }
+
+/* ---- Site top bar ---- */
+.thrml-topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 998; height: 46px;
+  display: flex; align-items: center; justify-content: space-between; padding: 0 18px;
+  background: rgba(7,7,8,.88); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255,132,0,.16);
+  font-family: "Suisse Int'l Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+.thrml-topbar .thrml-bar-left { display: flex; align-items: center; gap: 8px; }
+.thrml-topbar .thrml-burger { display: none; background: none; border: 0; color: var(--ex-cream);
+  cursor: pointer; padding: 4px; align-items: center; }
+.thrml-topbar .thrml-brand { display: inline-flex; align-items: center; gap: 9px; color: var(--ex-cream); text-decoration: none !important; }
+.thrml-topbar .thrml-logo { width: auto; height: 22px; flex-shrink: 0; color: var(--ex-cream);
+  transition: color .2s ease, filter .2s ease; }
+.thrml-topbar .thrml-brand:hover .thrml-logo { animation: thrmlShimmer 1.2s ease-in-out infinite; }
+@keyframes thrmlShimmer {
+  0%, 100% { color: #F2ECE1; filter: drop-shadow(0 0 0 rgba(245,214,76,0)); }
+  35% { color: #F5D64C; filter: drop-shadow(0 0 7px rgba(245,214,76,.75)); }
+  70% { color: #FF8400; filter: drop-shadow(0 0 9px rgba(255,132,0,.55)); }
+}
+.thrml-topbar .thrml-title { font-family: "Rephlex Trial", "Suisse BP Int'l", sans-serif; font-size: 17px;
+  letter-spacing: 0.12em; color: var(--ex-cream); }
+.thrml-topbar .thrml-pills { display: flex; gap: 8px; }
+.thrml-topbar .thrml-pill { display: inline-flex; align-items: center; font-size: 10.5px; letter-spacing: -0.01em;
+  text-transform: uppercase; color: var(--ex-cream); background: transparent; border: 1px solid rgba(255,132,0,.42);
+  border-radius: 2px; padding: 6px 13px; text-decoration: none !important;
+  transition: background .16s ease, border-color .16s ease; }
+.thrml-topbar .thrml-pill:hover { background: rgba(255,132,0,.16); border-color: var(--ex-accent); }
+/* Shrink the top bar's wordmark + pills on phones so they never overflow / clip. */
+@media (max-width: 560px) {
+  .thrml-topbar { padding: 0 12px; }
+  .thrml-topbar .thrml-title { font-size: 14px; letter-spacing: .08em; }
+  .thrml-topbar .thrml-pills { gap: 5px; }
+  .thrml-topbar .thrml-pill { font-size: 9px; padding: 5px 8px; letter-spacing: 0; }
+}
+@media (max-width: 380px) { .thrml-topbar .thrml-title { display: none; } }
+
+/* ---- Left sidebar (docs + notebooks) ---- */
+.thrml-sidebar { position: fixed; top: 46px; left: 0; bottom: 0; width: 16.5rem; z-index: 997;
+  overflow-y: auto; padding: 1.1rem 0 3.5rem; background: #0c0c0e;
+  border-right: 1px solid rgba(255,132,0,.09);
+  font-family: "Suisse Int'l Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+.thrml-sidebar::-webkit-scrollbar { width: 8px; }
+.thrml-sidebar::-webkit-scrollbar-thumb { background: #2A2622; border-radius: 6px; }
+.thrml-sidenav { display: flex; flex-direction: column; }
+.thrml-sidebar a { text-decoration: none; display: block; }
+/* Top-level sections (Examples, API reference) are display-serif headings; the
+   group labels under them (Foundations, ...) stay quiet mono caps, so the two
+   tiers read as a clear hierarchy instead of two near-identical gray labels. */
+.sb-section { padding: 1.8rem 1.5rem .45rem; font-family: var(--ex-subhead); font-size: 1rem;
+  font-weight: 500; letter-spacing: -0.01em; color: var(--ex-cream); }
+.sb-link { padding: .5rem 1.5rem; font-size: 12.5px; line-height: 1.45; color: rgba(243,236,224,.72);
+  border-left: 2px solid transparent; transition: color .12s, border-color .12s, background .12s; }
+.sb-link:hover, .sb-nb:hover { color: var(--ex-cream); background: rgba(255,132,0,.05); }
+.sb-link.active, .sb-nb.active { color: var(--ex-accent); font-weight: 600;
+  border-left-color: var(--ex-accent); background: rgba(255,132,0,.13); }
+.sb-group { margin-top: .3rem; }
+.sb-grouphead { padding: 1rem 1.5rem .4rem; margin-left: .1rem; font-size: 9.5px; font-weight: 500;
+  letter-spacing: -0.01em; text-transform: uppercase; color: rgba(243,236,224,.42); }
+.sb-nb { padding: .42rem 1.5rem; font-size: 12.5px; line-height: 1.5; color: rgba(243,236,224,.68);
+  border-left: 2px solid transparent; transition: color .12s, border-color .12s, background .12s; }
+.sb-nb .sb-n { color: var(--ex-accent); font-size: 10.5px; letter-spacing: -0.01em; margin-right: .55em; }
+/* Slide an underline under the notebook title on hover, matching the prose links. */
+.sb-nb .sb-t { background-image: linear-gradient(var(--ex-orange), var(--ex-orange));
+  background-size: 0% 1.5px; background-position: left bottom; background-repeat: no-repeat;
+  transition: background-size .22s ease; }
+.sb-nb:hover .sb-t { background-size: 100% 1.5px; }
+
+/* previous / next notebook navigation */
+.thrml-pagenav { display: flex; gap: 14px; margin: 3.4rem 0 .5rem; padding-top: 1.8rem;
+  border-top: 1px solid var(--ex-rule); }
+.thrml-pn { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: .35rem;
+  border: 1px solid var(--ex-copper); border-radius: 2px; padding: .95rem 1.1rem;
+  text-decoration: none !important; border-bottom: 1px solid var(--ex-copper) !important;
+  background: rgba(243,236,224,.025); transition: transform .15s, border-color .15s, background .15s; }
+.thrml-pn:hover { transform: translateY(-2px); border-color: var(--ex-accent) !important; background: rgba(255,132,0,.06); }
+.thrml-pn-next { text-align: right; align-items: flex-end; }
+.thrml-pn-empty { background: none; border: none !important; pointer-events: none; }
+.thrml-pn-dir { font-family: var(--jp-code-font-family); font-size: .68rem; letter-spacing: -0.01em;
+  text-transform: uppercase; color: var(--ex-accent); }
+.thrml-pn-title { font-family: var(--ex-subhead); color: var(--ex-cream); font-size: 1.02rem;
+  font-weight: 500; line-height: 1.3; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thrml-pn-n { color: var(--ex-muted); font-family: var(--jp-code-font-family); font-size: .82rem; margin-right: .5em; }
+
+/* Push content right of the sidebar on wide screens */
+@media (min-width: 64rem) { body.thrml-has-sidebar { padding-left: 16.5rem; } }
+@media (max-width: 64rem) {
+  .thrml-sidebar { transform: translateX(-100%); transition: transform .2s ease;
+    box-shadow: 0 0 40px rgba(0,0,0,.6); }
+  .thrml-sidebar.thrml-open { transform: translateX(0); }
+  .thrml-topbar .thrml-burger { display: inline-flex; }
+}
+/* Dim the page behind the open mobile drawer; tapping it closes the menu. */
+.thrml-backdrop { position: fixed; inset: 46px 0 0 0; z-index: 996; background: rgba(0,0,0,.55);
+  opacity: 0; pointer-events: none; transition: opacity .2s; }
+.thrml-backdrop.thrml-open { opacity: 1; pointer-events: auto; }
+@media (min-width: 64rem) { .thrml-backdrop { display: none; } }
+/* Smooth cross-document navigation: crossfade the content, hold the chrome
+   in place. Browsers without view transitions just navigate normally; under
+   prefers-reduced-motion the transition is skipped automatically. */
+@view-transition { navigation: auto; }
+.thrml-topbar { view-transition-name: thrml-topbar; }
+.thrml-sidebar { view-transition-name: thrml-sidebar; }
+::view-transition-group(root) { animation-duration: .2s; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .2s; }
