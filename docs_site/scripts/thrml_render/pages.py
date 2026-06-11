@@ -320,8 +320,8 @@ def write_index(entries):
         '<!doctype html>\n<html lang="en">\n<head>\n'
         '<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-        "<title>THRML &middot; Thermodynamic Graphical Models</title>\n"
-        '<meta name="description" content="THRML is a JAX library for block Gibbs sampling of probabilistic graphical models and energy-based models, built to prototype on Extropic\'s thermodynamic sampling hardware.">\n'
+        "<title>THRML &middot; Thermodynamic Hypergraphical Models</title>\n"
+        '<meta name="description" content="THRML is a JAX library for block Gibbs sampling of probabilistic hypergraphical models and energy-based models, built to prototype on Extropic\'s thermodynamic sampling hardware.">\n'
         + css(INDEX_CSS)
         + "<style>@view-transition { navigation: auto; }</style>\n"
         + SPECULATION_RULES_INLINE
@@ -341,10 +341,10 @@ def write_index(entries):
   <section class="hero">
     <div class="hero-text">
       <div class="hero-eyebrow"><img src="assets/extropic_wordmark.png" alt="Extropic"></div>
-      <h1>Thermodynamic graphical models</h1>
-      <p class="tagline">THRML is a JAX library for block Gibbs sampling of graphical models and
-      energy-based models. Build a model from nodes and factors, divide it into blocks via graph-colouring,
-      and sample, the same structure Extropic's hardware is built to accelerate.</p>
+      <h1>Thermodynamic hypergraphical models</h1>
+      <p class="tagline">THRML is a JAX library for block Gibbs sampling of hypergraphical and
+      energy-based models. Build a model from nodes and many-body factors, divide it into blocks via
+      graph-colouring, and sample, the same structure Extropic's hardware is built to accelerate.</p>
       <div class="cta">
         <a class="pill solid" href="getting-started.html">Get started &rarr;</a>
         <a class="pill" href="{INDEX_GITHUB}">View on GitHub</a>
