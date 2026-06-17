@@ -27,7 +27,7 @@ def build_topbar():
         '<nav class="thrml-pills">'
         '<a class="thrml-pill" href="getting-started.html">Get started</a>'
         '<a class="thrml-pill" href="examples.html">Examples</a>'
-        '<a class="thrml-pill" href="/papers/codon-optimization">Paper</a>'
+        '<a class="thrml-pill" href="papers/codon-optimization/">Paper</a>'
         '<a class="thrml-pill" href="' + INDEX_GITHUB + '">GitHub</a>'
         "</nav></header>"
     )
