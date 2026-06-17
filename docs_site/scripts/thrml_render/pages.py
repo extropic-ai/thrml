@@ -333,7 +333,7 @@ def write_index(entries):
     <nav class="pills">
       <a class="pill" href="getting-started.html">Docs</a>
       <a class="pill" href="examples.html">Examples</a>
-      <a class="pill" href="paper.html">Paper</a>
+      <a class="pill" href="/papers/codon-optimization">Paper</a>
       <a class="pill" href="{INDEX_GITHUB}">GitHub</a>
     </nav>
   </header>
@@ -392,7 +392,7 @@ def write_index(entries):
       </a>
     </div>
     <div class="apps-links">
-      <a class="browse" href="paper.html">Read the paper &rarr;</a>
+      <a class="browse" href="/papers/codon-optimization">Read the paper &rarr;</a>
       <a class="browse" href="https://github.com/extropic-ai/codon_opt">Reproduction code on GitHub &rarr;</a>
     </div>
   </section>
