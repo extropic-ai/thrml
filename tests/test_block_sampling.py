@@ -6,6 +6,7 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, Key, PyTree
 
+from thrml import sample_states
 from thrml.block_management import Block
 from thrml.block_sampling import (
     BlockGibbsSpec,
@@ -13,7 +14,6 @@ from thrml.block_sampling import (
     SamplingSchedule,
     sample_blocks,
     sample_single_block,
-    sample_states,
 )
 from thrml.conditional_samplers import AbstractConditionalSampler, _SamplerState, _State
 from thrml.interaction import InteractionGroup

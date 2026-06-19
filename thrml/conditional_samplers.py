@@ -1,15 +1,15 @@
 import abc
 from typing import TypeVar
 
-import equinox as eqx
 import jax
+from ihoop.eqx import AbstractStrictModule
 from jaxtyping import Array, Key, PyTree, Shaped
 
 _State = PyTree[Shaped[Array, "nodes ?*state"], "State"]
 _SamplerState = TypeVar("_SamplerState", bound=PyTree)
 
 
-class AbstractConditionalSampler(eqx.Module):
+class AbstractConditionalSampler(AbstractStrictModule):
     """
     Base class for all conditional samplers.
 
@@ -58,7 +58,8 @@ class AbstractConditionalSampler(eqx.Module):
         """
         pass
 
-    def init(self) -> None:
+    @abc.abstractmethod
+    def init(self) -> PyTree:
         """Initialize the sampler state before sampling begins.
 
         This is called before the first iteration of block sampling, after which the return of this method is
@@ -67,7 +68,7 @@ class AbstractConditionalSampler(eqx.Module):
         Returns:
             the initial sampler state to use for the first iteration of block sampling.
         """
-        return None
+        raise NotImplementedError
 
 
 class AbstractParametricConditionalSampler(AbstractConditionalSampler):
@@ -118,7 +119,7 @@ class AbstractParametricConditionalSampler(AbstractConditionalSampler):
         return self.sample_given_parameters(key, parameters, state, output_sd)
 
 
-class BernoulliConditional(AbstractParametricConditionalSampler):
+class AbstractBernoulliConditional(AbstractParametricConditionalSampler):
     r"""Sample from a bernoulli distribution.
 
     This sampler is designed to sample from a spin-valued bernoulli distribution:
@@ -151,7 +152,7 @@ class BernoulliConditional(AbstractParametricConditionalSampler):
         return jax.random.bernoulli(key, jax.nn.sigmoid(2 * parameters)), sampler_state
 
 
-class SoftmaxConditional(AbstractParametricConditionalSampler):
+class AbstractSoftmaxConditional(AbstractParametricConditionalSampler):
     r"""Sample from a softmax distribution.
 
     This sampler samples from the standard softmax distribution:

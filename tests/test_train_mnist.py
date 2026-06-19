@@ -8,8 +8,9 @@ import optax
 import pytest
 from jaxtyping import Array, Key
 
+from thrml import sample_states
 from thrml.block_management import Block
-from thrml.block_sampling import SamplingSchedule, sample_states
+from thrml.block_sampling import SamplingSchedule
 from thrml.models.ising import Edge, IsingEBM, IsingSamplingProgram, IsingTrainingSpec, estimate_kl_grad, hinton_init
 from thrml.pgm import AbstractNode, SpinNode
 

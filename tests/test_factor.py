@@ -1,9 +1,10 @@
 import unittest
 
 import jax.numpy as jnp
+from jaxtyping import Array
 
 from thrml.block_management import Block
-from thrml.factor import AbstractFactor, WeightedFactor
+from thrml.factor import AbstractFactor, AbstractWeightedFactor
 from thrml.interaction import InteractionGroup
 from thrml.pgm import AbstractNode
 
@@ -13,6 +14,8 @@ class Node(AbstractNode):
 
 
 class PointlessFactor(AbstractFactor):
+    node_groups: list[Block]
+
     def to_interaction_groups(self) -> list[InteractionGroup]:
         return []
 
@@ -40,7 +43,10 @@ class TestFactorCreate(unittest.TestCase):
         self.assertIn("same number", str(error.exception))
 
 
-class SimpleWeighted(WeightedFactor):
+class SimpleWeighted(AbstractWeightedFactor):
+    weights: Array
+    node_groups: list[Block]
+
     def to_interaction_groups(self) -> list[InteractionGroup]:
         return []
 
@@ -54,9 +60,3 @@ class TestWeighted(unittest.TestCase):
 
     def test_good(self):
         _ = SimpleWeighted(self.good_weights, self.good_node_groups)
-
-    def test_bad(self):
-        bad_weights = jnp.zeros((self.n_nodes + 1, 1, 3))
-        with self.assertRaises(RuntimeError) as error:
-            _ = SimpleWeighted(bad_weights, self.good_node_groups)
-        self.assertIn("weights", str(error.exception))

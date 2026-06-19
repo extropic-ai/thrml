@@ -1,3 +1,4 @@
+from .discrete_ebm import AbstractDiscreteEBMFactor as AbstractDiscreteEBMFactor
 from .discrete_ebm import CategoricalEBMFactor as CategoricalEBMFactor
 from .discrete_ebm import CategoricalGibbsConditional as CategoricalGibbsConditional
 from .discrete_ebm import DiscreteEBMFactor as DiscreteEBMFactor
@@ -7,8 +8,8 @@ from .discrete_ebm import SpinGibbsConditional as SpinGibbsConditional
 from .discrete_ebm import SquareCategoricalEBMFactor as SquareCategoricalEBMFactor
 from .discrete_ebm import SquareDiscreteEBMFactor as SquareDiscreteEBMFactor
 from .ebm import AbstractEBM as AbstractEBM
+from .ebm import AbstractEBMFactor as AbstractEBMFactor
 from .ebm import AbstractFactorizedEBM as AbstractFactorizedEBM
-from .ebm import EBMFactor as EBMFactor
 from .ebm import FactorizedEBM as FactorizedEBM
 from .ising import IsingEBM as IsingEBM
 from .ising import IsingSamplingProgram as IsingSamplingProgram

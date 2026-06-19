@@ -8,8 +8,9 @@ import networkx as nx
 import numpy as np
 from jax import numpy as jnp
 
+from thrml import sample_states
 from thrml.block_management import Block
-from thrml.block_sampling import BlockGibbsSpec, SamplingSchedule, sample_single_block, sample_states
+from thrml.block_sampling import BlockGibbsSpec, SamplingSchedule, sample_single_block
 from thrml.factor import FactorSamplingProgram
 from thrml.models.discrete_ebm import (
     CategoricalEBMFactor,

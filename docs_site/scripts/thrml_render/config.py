@@ -106,7 +106,7 @@ API_CATEGORIES = [
         "module": "thrml",
         "group": "Core",
         "blurb": "Factors organize the interactions between variables and synthesize them into interaction groups. A FactorSamplingProgram wraps a set of factors into a runnable sampler.",
-        "symbols": ["AbstractFactor", "WeightedFactor", "FactorSamplingProgram"],
+        "symbols": ["AbstractFactor", "AbstractWeightedFactor", "FactorSamplingProgram"],
     },
     {
         "label": "Interaction groups",
@@ -125,8 +125,8 @@ API_CATEGORIES = [
         "symbols": [
             "AbstractConditionalSampler",
             "AbstractParametricConditionalSampler",
-            "BernoulliConditional",
-            "SoftmaxConditional",
+            "AbstractBernoulliConditional",
+            "AbstractSoftmaxConditional",
         ],
     },
     {
@@ -138,6 +138,7 @@ API_CATEGORIES = [
         "symbols": [
             "SamplingSchedule",
             "BlockGibbsSpec",
+            "AbstractBlockSamplingProgram",
             "BlockSamplingProgram",
             "sample_states",
             "sample_blocks",
@@ -159,7 +160,7 @@ API_CATEGORIES = [
         "module": "thrml.models",
         "group": "Models",
         "blurb": "Energy-based models define a distribution through an energy function. THRML factorizes that energy so block Gibbs can sample it.",
-        "symbols": ["AbstractEBM", "AbstractFactorizedEBM", "FactorizedEBM", "EBMFactor"],
+        "symbols": ["AbstractEBM", "AbstractEBMFactor", "AbstractFactorizedEBM", "FactorizedEBM"],
     },
     {
         "label": "Discrete energy-based models",
@@ -168,6 +169,7 @@ API_CATEGORIES = [
         "group": "Models",
         "blurb": "Discrete EBM building blocks for spin and categorical variables, with square-tensor specializations and their matching Gibbs conditionals.",
         "symbols": [
+            "AbstractDiscreteEBMFactor",
             "DiscreteEBMFactor",
             "DiscreteEBMInteraction",
             "SquareDiscreteEBMFactor",

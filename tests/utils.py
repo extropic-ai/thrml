@@ -5,8 +5,9 @@ import numpy as np
 from jax import numpy as jnp
 from jaxtyping import Array, Key
 
+from thrml import sample_states
 from thrml.block_management import Block
-from thrml.block_sampling import BlockSamplingProgram, SamplingSchedule, sample_states
+from thrml.block_sampling import BlockSamplingProgram, SamplingSchedule
 from thrml.models.ebm import AbstractEBM
 from thrml.pgm import DEFAULT_NODE_SHAPE_DTYPES, CategoricalNode, SpinNode
 

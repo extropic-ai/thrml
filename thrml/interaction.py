@@ -1,12 +1,12 @@
-import equinox as eqx
 import jax
 import jax.numpy as jnp
+from ihoop.eqx import AbstractStrictModule
 from jaxtyping import PyTree
 
 from thrml.block_management import Block
 
 
-class InteractionGroup(eqx.Module):
+class InteractionGroup(AbstractStrictModule):
     """Defines computational dependencies for conditional sampling updates.
 
     An `InteractionGroup` specifies information that is required to update the state of some subset
