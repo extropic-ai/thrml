@@ -340,7 +340,7 @@ def write_index(entries):
 
   <section class="hero">
     <div class="hero-text">
-      <div class="hero-eyebrow"><img src="assets/extropic_wordmark.png" alt="Extropic"></div>
+      <div class="hero-eyebrow"><a href="https://extropic.ai"><img src="assets/extropic_wordmark.png" alt="Extropic"></a></div>
       <h1>Thermodynamic hypergraphical models</h1>
       <p class="tagline">THRML is a JAX library for block Gibbs sampling of hypergraphical and
       energy-based models. Build a model from nodes and many-body factors, divide it into blocks via
@@ -403,7 +403,7 @@ def write_index(entries):
       <source src="{ASSET_BASE}/videos/extropic-footer.mp4" type="video/mp4">
     </video>
     <div class="foot-inner">
-      <span>THRML &middot; EXTROPIC</span>
+      <span>THRML &middot; <a href="https://extropic.ai">EXTROPIC</a></span>
       <span><a href="{INDEX_GITHUB}">GitHub</a></span>
     </div>
   </footer>
