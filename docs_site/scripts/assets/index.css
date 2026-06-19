@@ -76,7 +76,9 @@ a { color: var(--gold); text-decoration: none; }
   display: grid; grid-template-columns: 1.18fr .82fr; gap: 2.5rem; align-items: center; }
 .hero-text { min-width: 0; }
 .hero-eyebrow { margin: 0 0 1.6rem; }
-.hero-eyebrow img { display: block; height: 14px; width: auto; opacity: .8; }
+.hero-eyebrow a { display: inline-block; line-height: 0; }
+.hero-eyebrow img { display: block; height: 14px; width: auto; opacity: .8; transition: opacity .15s ease; }
+.hero-eyebrow a:hover img { opacity: 1; }
 .hero-kicker { display: inline-block; font-family: var(--mono); font-size: 11px; letter-spacing: .22em;
   text-transform: uppercase; color: var(--orange); padding-bottom: .6rem;
   border-bottom: 1px solid var(--rule); }
