@@ -140,6 +140,21 @@ def test_no_mangled_jax_prefix_in_pages(site):
         assert "jaxPyTree" not in page.read_text(encoding="utf-8"), f"mangled jaxtyping prefix in {page.name}"
 
 
+def test_member_docstring_latex_not_mangled(site):
+    # Raw-string LaTeX in member docstrings must survive: a non-raw "$\theta$" used to
+    # be parsed as "$<tab>heta$" and render as broken MathJax ("$ heta$").
+    html = (site / "api-samplers.html").read_text(encoding="utf-8")
+    assert "\\theta" in html, "\\theta missing/mangled in rendered member docs"
+    assert " heta$" not in html, "tab-mangled \\theta ($ heta$) shipped to the page"
+
+
+def test_callable_protocol_documents_dunder_call(site):
+    # __call__ is the contract method of callable protocols (AbstractObserver); member
+    # rendering must surface it rather than filtering it out as a dunder.
+    html = (site / "api-observers.html").read_text(encoding="utf-8")
+    assert 'id="AbstractObserver.__call__"' in html, "__call__ omitted from AbstractObserver members"
+
+
 def test_validate_catalog_tolerates_skip_render(monkeypatch):
     # Skipping a notebook (present on disk, kept off the site) must not false-fail
     # the catalog validator just because the notebook is still listed in the catalog.

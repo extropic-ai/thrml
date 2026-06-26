@@ -250,10 +250,12 @@ def _member_lineno(cls, name):
 
 
 def _method_names(cls):
-    """Public methods and properties on cls, including inherited, source-ordered."""
+    """Public methods and properties on cls (plus ``__call__``), inherited, source-ordered."""
     names = []
     for name in dir(cls):
-        if name.startswith("_"):
+        # Skip private/dunder names except __call__, the contract method of the
+        # callable protocols (AbstractObserver, the conditional samplers).
+        if name.startswith("_") and name != "__call__":
             continue
         try:
             static = inspect.getattr_static(cls, name)
