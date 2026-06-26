@@ -12,6 +12,7 @@ from .config import (
     INDEX_SECTIONS,
     LOGO_SVG,
     SPECULATION_RULES,
+    og_meta,
 )
 from .text import replace_once
 
@@ -128,9 +129,10 @@ def prev_next_nav(entries, active_stem):
     return '<nav class="thrml-pagenav" aria-label="Notebook navigation">' + prev_html + next_html + "</nav>"
 
 
-def inject_chrome(html, entries, active_stem):
-    """Add the theme, top bar, and sidebar to an exported notebook page."""
-    html = replace_once(html, "</head>", "\n" + css(COLLAPSE_STYLE) + "</head>", "</head> marker")
+def inject_chrome(html, entries, active_stem, title):
+    """Add the theme, top bar, sidebar, and social-card metadata to a notebook page."""
+    head_extra = og_meta(f"{title} · THRML", f"{active_stem}.html") + css(COLLAPSE_STYLE)
+    html = replace_once(html, "</head>", "\n" + head_extra + "</head>", "</head> marker")
     chrome = build_topbar() + build_sidebar(entries, active_stem=active_stem)
     html = _inject_body(html, "thrml-has-sidebar", chrome)
     nav = prev_next_nav(entries, active_stem)

@@ -1,5 +1,6 @@
 """Paths, URLs, and pure-data configuration for the THRML docs build."""
 
+import html as html_lib
 import re
 from pathlib import Path
 
@@ -258,3 +259,36 @@ def validate_notebook_catalog(paths=None):
     if extra_blurbs:
         errors.append(f"INDEX_BLURBS entries without notebooks: {extra_blurbs}")
     return errors
+
+
+DEFAULT_DESCRIPTION = (
+    "THRML is a JAX library for block Gibbs sampling of probabilistic hypergraphical "
+    "and energy-based models, built to prototype on Extropic's thermodynamic sampling hardware."
+)
+
+
+def og_meta(title, page, description=DEFAULT_DESCRIPTION):
+    """Open Graph + Twitter-card <head> tags for social link unfurls.
+
+    ``page`` is the rendered filename (e.g. ``index.html``); the canonical URL and
+    the shared 1200x630 card image are built against the live deploy host.
+    """
+    # Canonicalize to the published docs host; og.png ships into the site root.
+    base = SITE_URL.rstrip("/")
+    url = f"{base}/{page}"
+    image = f"{base}/og.png"
+    title = html_lib.escape(title)
+    description = html_lib.escape(description)
+    return (
+        '<meta property="og:type" content="website">\n'
+        '<meta property="og:site_name" content="THRML">\n'
+        f'<meta property="og:title" content="{title}">\n'
+        f'<meta property="og:description" content="{description}">\n'
+        f'<meta property="og:url" content="{url}">\n'
+        f'<meta property="og:image" content="{image}">\n'
+        '<meta property="og:image:width" content="1200">\n'
+        '<meta property="og:image:height" content="630">\n'
+        # X/Twitter, Slack, and iMessage fall back to the og:* tags, so only
+        # twitter:card (which requests the large-image layout) is non-redundant.
+        '<meta name="twitter:card" content="summary_large_image">\n'
+    )

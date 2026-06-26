@@ -153,6 +153,23 @@ def test_callable_protocol_documents_dunder_call(site):
     assert 'id="AbstractObserver.__call__"' in html, "__call__ omitted from AbstractObserver members"
 
 
+def test_og_card_meta_on_rendered_pages(site):
+    # Every renderer-generated page carries Open Graph + Twitter-card tags pointing
+    # at the shared 1200x630 card, and the card ships at the site root. Static-copied
+    # pages (e.g. the paper redirect stub) are not templated, so they're excluded.
+    generated = ["index.html", "getting-started.html", "concepts.html", "examples.html"]
+    generated += [p.name for p in site.glob("api-*.html")]
+    generated += [f"{p.stem}.html" for p in NOTEBOOKS.glob("[0-9]*.ipynb")]
+    for name in generated:
+        html = (site / name).read_text(encoding="utf-8")
+        assert 'property="og:image"' in html, f"missing og:image in {name}"
+        assert 'property="og:title"' in html, f"missing og:title in {name}"
+        assert '"twitter:card" content="summary_large_image"' in html, f"missing twitter card in {name}"
+        assert "https://docs.thrml.ai/og.png" in html, f"wrong og:image url in {name}"
+    og = site / "og.png"
+    assert og.exists() and og.stat().st_size > 0, "og.png not shipped to the site root"
+
+
 def test_validate_catalog_tolerates_skip_render(monkeypatch):
     # Skipping a notebook (present on disk, kept off the site) must not false-fail
     # the catalog validator just because the notebook is still listed in the catalog.

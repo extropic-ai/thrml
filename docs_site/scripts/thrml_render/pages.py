@@ -27,6 +27,7 @@ from .config import (
     SITE_URL,
     SPECULATION_RULES,
     SPECULATION_RULES_INLINE,
+    og_meta,
 )
 
 
@@ -47,6 +48,7 @@ def write_doc_page(slug, title, inner, entries, active_page, *, mathjax=False, a
         '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f"<title>{title} &middot; THRML</title>\n"
+        + og_meta(f"{title} · THRML", f"{slug}.html")
         + "\n"
         + css(COLLAPSE_STYLE)
         + "\n"
@@ -322,6 +324,7 @@ def write_index(entries):
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         "<title>THRML &middot; Thermodynamic Hypergraphical Models</title>\n"
         '<meta name="description" content="THRML is a JAX library for block Gibbs sampling of probabilistic hypergraphical models and energy-based models, built to prototype on Extropic\'s thermodynamic sampling hardware.">\n'
+        + og_meta("THRML · Thermodynamic Hypergraphical Models", "index.html")
         + css(INDEX_CSS)
         + "<style>@view-transition { navigation: auto; }</style>\n"
         + SPECULATION_RULES_INLINE
