@@ -19,8 +19,13 @@ def _read(name):
 
 def css(blob):
     """Wrap raw CSS in a <style> block, resolving the ASSET_BASE/ placeholder in
-    @font-face urls to the configured CDN host."""
-    return f"<style>\n{blob.replace('ASSET_BASE/', ASSET_BASE.rstrip('/') + '/')}</style>\n"
+    @font-face urls to the configured CDN host.
+
+    Asserts the placeholder is fully resolved, so a malformed ASSET_BASE/ token
+    fails loudly at build time instead of shipping a broken font url."""
+    resolved = blob.replace("ASSET_BASE/", ASSET_BASE.rstrip("/") + "/")
+    assert "ASSET_BASE/" not in resolved, "unresolved ASSET_BASE/ placeholder after substitution"
+    return f"<style>\n{resolved}</style>\n"
 
 
 def js(blob):

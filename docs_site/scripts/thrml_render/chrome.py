@@ -1,8 +1,13 @@
 """Shared page chrome (top bar, sidebar, nav) and notebook link rewriting."""
 
+from __future__ import annotations
+
 import html as html_lib
 import re
 from pathlib import Path
+
+# A sidebar/reading-order entry: (notebook number, title, href).
+Entry = tuple[str, str, str]
 
 from .assets import COLLAPSE_SCRIPT, COLLAPSE_STYLE, css, js
 from .config import (
@@ -13,6 +18,7 @@ from .config import (
     LOGO_SVG,
     SPECULATION_RULES,
 )
+from .text import replace_once
 
 
 def build_topbar():
@@ -72,22 +78,29 @@ def build_sidebar(entries, active_stem=None, active_page=None, active_api=None):
     return "".join(parts)
 
 
-def _add_body_class(html, cls):
+def _inject_body(html, body_class, chrome):
+    """Add a body class and inject the chrome markup in one pass over <body>.
+
+    Raises if there is not exactly one ``<body>`` so a notebook cell that emits a
+    stray ``<body`` (or a template change) fails loudly instead of injecting the
+    sidebar at the wrong spot."""
+    if html.count("<body") != 1:
+        raise RuntimeError(f"expected exactly one <body> marker, found {html.count('<body')}")
     match = re.search(r"<body([^>]*)>", html)
     if not match:
-        return html
+        raise RuntimeError("missing <body> marker")
     attrs = match.group(1)
     if 'class="' in attrs:
-        attrs = re.sub(r'class="', f'class="{cls} ', attrs, count=1)
+        attrs = re.sub(r'class="', f'class="{body_class} ', attrs, count=1)
     else:
-        attrs = attrs + f' class="{cls}"'
-    return html[: match.start()] + f"<body{attrs}>" + html[match.end() :]
+        attrs = attrs + f' class="{body_class}"'
+    return html[: match.start()] + f"<body{attrs}>{chrome}" + html[match.end() :]
 
 
-def reading_order(entries):
+def reading_order(entries: list[Entry]) -> list[Entry]:
     """Notebook entries flattened into the sidebar reading order."""
     by_num = {number: (title, href) for number, title, href in entries}
-    ordered = []
+    ordered: list[Entry] = []
     for _name, _sub, nums in INDEX_SECTIONS:
         for number in nums:
             if number in by_num:
@@ -121,23 +134,19 @@ def prev_next_nav(entries, active_stem):
 
 def inject_chrome(html, entries, active_stem):
     """Add the theme, top bar, and sidebar to an exported notebook page."""
-    if "</head>" in html:
-        html = html.replace("</head>", "\n" + css(COLLAPSE_STYLE) + "</head>", 1)
-    html = _add_body_class(html, "thrml-has-sidebar")
+    html = replace_once(html, "</head>", "\n" + css(COLLAPSE_STYLE) + "</head>", "</head> marker")
     chrome = build_topbar() + build_sidebar(entries, active_stem=active_stem)
-    html = re.sub(r"(<body[^>]*>)", lambda m: m.group(1) + chrome, html, count=1)
+    html = _inject_body(html, "thrml-has-sidebar", chrome)
     nav = prev_next_nav(entries, active_stem)
-    if nav and "</main>" in html:
-        html = html.replace("</main>", nav + "</main>", 1)
-    if "</body>" in html:
-        html = html.replace("</body>", "\n" + js(COLLAPSE_SCRIPT) + SPECULATION_RULES + "</body>", 1)
-    return html
+    if nav:
+        html = replace_once(html, "</main>", nav + "</main>", "</main> marker")
+    return replace_once(html, "</body>", "\n" + js(COLLAPSE_SCRIPT) + SPECULATION_RULES + "</body>", "</body> marker")
 
 
 def rewrite_nb_links(html: str) -> str:
     """Rewrite relative cross-notebook links from .ipynb to .html. Absolute URLs
     (which contain ``://``) are left untouched."""
-    return re.sub(r'href="([^":#]*?)\.ipynb(#[^"]*)??"', _nb_to_html, html)
+    return re.sub(r'href="([^":#]*?)\.ipynb(#[^"]*)?"', _nb_to_html, html)
 
 
 def rewrite_local_images(html: str) -> str:

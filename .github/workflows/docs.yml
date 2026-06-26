@@ -1,0 +1,28 @@
+name: Build docs
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+jobs:
+  docs-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: pip install -e .[docs] pytest
+      - name: Build the docs site (smoke check)
+        run: python docs_site/scripts/render_html.py
+      - name: Run the docs render tests
+        run: python -m pytest docs_site/tests/test_docs_render.py -q

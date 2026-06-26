@@ -19,5 +19,5 @@ repos:
     rev: v1.1.408
     hooks:
     - id: pyright
-      additional_dependencies: [equinox, jaxtyping]
-      files: thrml/
+      additional_dependencies: [equinox, jaxtyping, nbformat, nbconvert]
+      files: ^(thrml/|docs_site/scripts/)
