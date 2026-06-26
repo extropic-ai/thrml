@@ -379,6 +379,10 @@ def write_index(entries):
 {featured_cards}
     </div>
     <a class="browse" href="{browse_href}">Browse all {n_examples} examples &rarr;</a>
+    <div class="apps-links" style="margin-top:1rem">
+      <a class="browse" href="https://github.com/pschilliOrange/dtm-replication">A larger project built on THRML: Denoising Thermodynamic Models &rarr;</a>
+      <a class="browse" href="https://arxiv.org/abs/2510.23972">Read the DTM paper (arXiv) &rarr;</a>
+    </div>
   </section>
 
   <section class="nb-wrap reveal" style="padding-top:3rem">
