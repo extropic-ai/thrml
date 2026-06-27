@@ -275,7 +275,8 @@ def og_meta(title, page, description=DEFAULT_DESCRIPTION):
     """
     # Canonicalize to the published docs host; og.png ships into the site root.
     base = SITE_URL.rstrip("/")
-    url = f"{base}/{page}"
+    # the homepage's canonical URL is the bare host, not /index.html
+    url = f"{base}/" if page == "index.html" else f"{base}/{page}"
     image = f"{base}/og.png"
     title = html_lib.escape(title)
     description = html_lib.escape(description)

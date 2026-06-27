@@ -137,7 +137,12 @@ def inject_chrome(html, entries, active_stem, title):
     html = _inject_body(html, "thrml-has-sidebar", chrome)
     nav = prev_next_nav(entries, active_stem)
     if nav:
-        html = replace_once(html, "</main>", nav + "</main>", "</main> marker")
+        # insert before the template's closing </main> (the last one), so a stray
+        # </main> in a notebook cell's raw-HTML output can't misplace the nav
+        idx = html.rfind("</main>")
+        if idx == -1:
+            raise RuntimeError("expected a </main> marker, found none")
+        html = html[:idx] + nav + html[idx:]
     return replace_once(html, "</body>", "\n" + js(COLLAPSE_SCRIPT) + SPECULATION_RULES + "</body>", "</body> marker")
 
 
