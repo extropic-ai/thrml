@@ -78,18 +78,18 @@ def examples_inner(entries):
         "its outputs.</p>",
     ]
     for name, blurb, nums in INDEX_SECTIONS:
-        parts.append(f"<h2>{name}</h2>")
+        parts.append(f"<h2>{html_lib.escape(name, quote=False)}</h2>")
         if blurb:
-            parts.append(f"<p>{blurb}</p>")
+            parts.append(f"<p>{html_lib.escape(blurb, quote=False)}</p>")
         parts.append('<div class="thrml-cards">')
         for number in nums:
             if number not in by_num:
                 continue
             title, href = by_num[number]
             parts.append(
-                f'<a class="thrml-card2" href="{href}">'
-                f'<span class="c2t">{number} &middot; {title}</span>'
-                f'<span class="c2b">{INDEX_BLURBS.get(number, "")}</span></a>'
+                f'<a class="thrml-card2" href="{html_lib.escape(href, quote=True)}">'
+                f'<span class="c2t">{number} &middot; {html_lib.escape(title, quote=False)}</span>'
+                f'<span class="c2b">{html_lib.escape(INDEX_BLURBS.get(number, ""), quote=False)}</span></a>'
             )
         parts.append("</div>")
     return "\n".join(parts)
@@ -283,10 +283,10 @@ def write_index(entries):
         title, href = by_num[num]
         blurb = INDEX_BLURBS.get(num, "")
         return (
-            f'      <a class="card" href="{href}">'
+            f'      <a class="card" href="{html_lib.escape(href, quote=True)}">'
             f'<span class="card-num">{num}</span>'
-            f'<span class="card-title">{title}</span>'
-            f'<span class="card-blurb">{blurb}</span></a>'
+            f'<span class="card-title">{html_lib.escape(title, quote=False)}</span>'
+            f'<span class="card-blurb">{html_lib.escape(blurb, quote=False)}</span></a>'
         )
 
     featured_cards = "\n".join(card(n) for n in ("00", "01", "02") if n in by_num)
@@ -436,6 +436,6 @@ def write_llms_txt(entries):
     out += ["", "## API reference"]
     for cat in API_CATEGORIES:
         mod = importlib.import_module(cat["module"])
-        present = ", ".join(s for s in cat["symbols"] if getattr(mod, s, None) is not None)
+        present = ", ".join(s for s in cat["symbols"] if hasattr(mod, s))
         out.append(f"- [{cat['label']}]({SITE_URL}/{cat['slug']}.html): {cat['blurb']} ({present})")
     (OUT_DIR / "llms.txt").write_text("\n".join(out) + "\n", encoding="utf-8")

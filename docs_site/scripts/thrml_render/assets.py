@@ -24,7 +24,8 @@ def css(blob):
     Asserts the placeholder is fully resolved, so a malformed ASSET_BASE/ token
     fails loudly at build time instead of shipping a broken font url."""
     resolved = blob.replace("ASSET_BASE/", ASSET_BASE.rstrip("/") + "/")
-    assert "ASSET_BASE/" not in resolved, "unresolved ASSET_BASE/ placeholder after substitution"
+    if "ASSET_BASE/" in resolved:
+        raise RuntimeError("unresolved ASSET_BASE/ placeholder after substitution")
     return f"<style>\n{resolved}</style>\n"
 
 

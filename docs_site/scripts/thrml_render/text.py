@@ -1,9 +1,7 @@
 """Small text-substitution helpers shared across the renderer."""
 
-from __future__ import annotations
 
-
-def replace_once(text: str, old: str, new: str, label: str) -> str:
+def replace_once(text, old, new, label):
     """Substitute the single expected occurrence of ``old`` with ``new``.
 
     Raises if ``old`` does not appear exactly once, so a template change or a

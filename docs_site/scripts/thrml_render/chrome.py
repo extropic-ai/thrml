@@ -1,13 +1,8 @@
 """Shared page chrome (top bar, sidebar, nav) and notebook link rewriting."""
 
-from __future__ import annotations
-
 import html as html_lib
 import re
 from pathlib import Path
-
-# A sidebar/reading-order entry: (notebook number, title, href).
-Entry = tuple[str, str, str]
 
 from .assets import COLLAPSE_SCRIPT, COLLAPSE_STYLE, css, js
 from .config import (
@@ -51,7 +46,7 @@ def build_sidebar(entries, active_stem=None, active_page=None, active_api=None):
     parts.append(doc_link("concepts", "Concepts"))
     parts.append('<div class="sb-section">Examples</div>')
     for name, _sub, nums in INDEX_SECTIONS:
-        parts.append(f'<div class="sb-group"><div class="sb-grouphead">{name}</div>')
+        parts.append(f'<div class="sb-group"><div class="sb-grouphead">{html_lib.escape(name, quote=False)}</div>')
         for number in nums:
             if number not in by_num:
                 continue
@@ -59,7 +54,7 @@ def build_sidebar(entries, active_stem=None, active_page=None, active_api=None):
             stem = href[:-5]
             cls = "sb-nb active" if active_stem == stem else "sb-nb"
             parts.append(
-                f'<a class="{cls}" href="{href}"><span class="sb-n">{number}</span><span class="sb-t">{title}</span></a>'
+                f'<a class="{cls}" href="{html_lib.escape(href, quote=True)}"><span class="sb-n">{number}</span><span class="sb-t">{html_lib.escape(title, quote=False)}</span></a>'
             )
         parts.append("</div>")
     parts.append('<div class="sb-section">API reference</div>')
@@ -97,10 +92,10 @@ def _inject_body(html, body_class, chrome):
     return html[: match.start()] + f"<body{attrs}>{chrome}" + html[match.end() :]
 
 
-def reading_order(entries: list[Entry]) -> list[Entry]:
+def reading_order(entries):
     """Notebook entries flattened into the sidebar reading order."""
     by_num = {number: (title, href) for number, title, href in entries}
-    ordered: list[Entry] = []
+    ordered = []
     for _name, _sub, nums in INDEX_SECTIONS:
         for number in nums:
             if number in by_num:
@@ -116,7 +111,8 @@ def prev_next_nav(entries, active_stem):
     if idx is None:
         return ""
 
-    def card(number, title, href, direction):
+    def card(entry, direction):
+        number, title, href = entry
         arrow = "&larr; Previous" if direction == "prev" else "Next &rarr;"
         return (
             f'<a class="thrml-pn thrml-pn-{direction}" href="{href}">'
@@ -125,9 +121,9 @@ def prev_next_nav(entries, active_stem):
             f"{html_lib.escape(title)}</span></a>"
         )
 
-    prev_html = card(*ordered[idx - 1], "prev") if idx > 0 else '<span class="thrml-pn thrml-pn-empty"></span>'
+    prev_html = card(ordered[idx - 1], "prev") if idx > 0 else '<span class="thrml-pn thrml-pn-empty"></span>'
     next_html = (
-        card(*ordered[idx + 1], "next") if idx < len(ordered) - 1 else '<span class="thrml-pn thrml-pn-empty"></span>'
+        card(ordered[idx + 1], "next") if idx < len(ordered) - 1 else '<span class="thrml-pn thrml-pn-empty"></span>'
     )
     return '<nav class="thrml-pagenav" aria-label="Notebook navigation">' + prev_html + next_html + "</nav>"
 
@@ -143,24 +139,24 @@ def inject_chrome(html, entries, active_stem):
     return replace_once(html, "</body>", "\n" + js(COLLAPSE_SCRIPT) + SPECULATION_RULES + "</body>", "</body> marker")
 
 
-def rewrite_nb_links(html: str) -> str:
+def rewrite_nb_links(html):
     """Rewrite relative cross-notebook links from .ipynb to .html. Absolute URLs
     (which contain ``://``) are left untouched."""
     return re.sub(r'href="([^":#]*?)\.ipynb(#[^"]*)?"', _nb_to_html, html)
 
 
-def rewrite_local_images(html: str) -> str:
+def rewrite_local_images(html):
     """Point notebook <img> tags at file-backed figures (e.g. fps.png, saved by a
     notebook and committed beside it) to the externalized copy under assets/."""
     return re.sub(r'src="\.{0,2}/?([\w./-]+\.png)"', lambda m: f'src="assets/{Path(m.group(1)).name}"', html)
 
 
-def fix_known_links(html: str) -> str:
+def fix_known_links(html):
     for bad, good in _LINK_FIXES.items():
         html = html.replace(bad, good)
     return html
 
 
-def _nb_to_html(m: re.Match) -> str:
+def _nb_to_html(m):
     stem, anchor = m.group(1), m.group(2) or ""
     return f'href="{stem}.html{anchor}"'

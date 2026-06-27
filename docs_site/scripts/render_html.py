@@ -57,6 +57,7 @@ from thrml_render.pages import (
     write_index,
     write_llms_txt,
 )
+from thrml_render.text import replace_once
 
 
 def _fail_if_errors(errors, label):
@@ -113,10 +114,11 @@ def main():
     for path, nb, _number, title in notebooks:
         tag_hidden_inputs(nb)
         body, _ = exporter.from_notebook_node(nb)
-        body = body.replace(
+        body = replace_once(
+            body,
             "<title>Notebook</title>",
             f"<title>{html_lib.escape(title)} &middot; THRML</title>",
-            1,
+            "notebook title marker",
         )
         body = externalize_images(body, path.stem)
         body = rewrite_local_images(body)

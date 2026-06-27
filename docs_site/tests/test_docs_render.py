@@ -7,8 +7,6 @@ the top-level ``tests/``) and ``importorskip``s the docs extras, so it runs only
 in the docs-build job where ``nbconvert``/``nbformat`` are installed.
 """
 
-from __future__ import annotations
-
 import importlib
 import subprocess
 import sys

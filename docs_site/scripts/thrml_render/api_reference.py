@@ -8,8 +8,6 @@ absent from its module is skipped with a warning, so a thrml API change never
 silently drops a symbol from the docs.
 """
 
-from __future__ import annotations
-
 import functools
 import html as html_lib
 import importlib
@@ -221,8 +219,13 @@ def render_docstring(doc):
     return res
 
 
-def _member_target(static: object) -> typing.Any:
-    """Unwrap a descriptor to the callable that carries the signature/docstring."""
+def _member_target(static) -> typing.Any:
+    """Unwrap a descriptor to the callable that carries the signature/docstring.
+
+    Returns ``Any`` deliberately: the result is an arbitrary unwrapped object fed
+    to ``inspect.getsourcelines``/``signature`` (whose failures the callers catch),
+    so this is the one justified type boundary in the renderer (cf. torx's typed
+    ``_find_repo_root``)."""
     if isinstance(static, property):
         return static.fget
     if isinstance(static, functools.cached_property):
