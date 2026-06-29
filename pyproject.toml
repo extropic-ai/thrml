@@ -59,7 +59,11 @@ line-length = 120
 
 [tool.pyright]
 reportUnnecessaryTypeIgnoreComment = true
-include = ["thrml"]
+include = ["thrml", "docs_site/scripts"]
+# The docs renderer lives under docs_site/scripts as the importable
+# ``thrml_render`` package; add it to the search path so its intra-package
+# imports resolve when pyright type-checks the renderer.
+extraPaths = ["docs_site/scripts"]
 
 [tool.pytest.ini_options]
 markers = [

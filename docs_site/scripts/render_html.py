@@ -25,7 +25,7 @@ import html as html_lib
 import shutil
 
 import nbformat
-from thrml_render.api_reference import api_inner, linkify_api
+from thrml_render.api_reference import api_inner, linkify_api, validate_api_reference
 from thrml_render.chrome import (
     fix_known_links,
     inject_chrome,
@@ -41,6 +41,7 @@ from thrml_render.config import (
     ROOT,
     SKIP_RENDER,
     STATIC_DIR,
+    validate_notebook_catalog,
 )
 from thrml_render.notebooks import (
     build_exporter,
@@ -56,12 +57,22 @@ from thrml_render.pages import (
     write_index,
     write_llms_txt,
 )
+from thrml_render.text import replace_once
+
+
+def _fail_if_errors(errors, label):
+    if errors:
+        joined = "\n".join(f"- {error}" for error in errors)
+        raise RuntimeError(f"{label} failed:\n{joined}")
 
 
 def copy_static():
     """Copy the file-backed assets the pages reference into rendered/."""
     FIG_DIR.mkdir(parents=True, exist_ok=True)
-    # Figures committed beside notebooks or in the brand dir.
+    # Figures committed beside notebooks or in the brand dir. The brand images
+    # (flow.png, extropic_wordmark.png) are licensed assets served from the CDN
+    # and intentionally absent from this public repo, so a missing source is
+    # skipped here (not a build error); the deploy mirror supplies them.
     for src, dst in [
         (NB_DIR / "fps.png", FIG_DIR / "fps.png"),
         (NB_DIR / "codon_pipeline.png", FIG_DIR / "codon_pipeline.png"),
@@ -82,6 +93,9 @@ def copy_static():
 
 def main():
     OUT_DIR.mkdir(exist_ok=True)
+    # Fail loudly on a notebook/catalog mismatch; warn (don't fail) on API drift.
+    _fail_if_errors(validate_notebook_catalog(), "notebook catalog validation")
+    validate_api_reference()
     copy_static()
     exporter = build_exporter()
 
@@ -100,10 +114,11 @@ def main():
     for path, nb, _number, title in notebooks:
         tag_hidden_inputs(nb)
         body, _ = exporter.from_notebook_node(nb)
-        body = body.replace(
+        body = replace_once(
+            body,
             "<title>Notebook</title>",
             f"<title>{html_lib.escape(title)} &middot; THRML</title>",
-            1,
+            "notebook title marker",
         )
         body = externalize_images(body, path.stem)
         body = rewrite_local_images(body)

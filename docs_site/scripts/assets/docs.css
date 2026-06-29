@@ -73,6 +73,11 @@ a.api-xref-plain { color: inherit; text-decoration: none; border-bottom: 1px dot
 a.api-xref-plain:hover { color: var(--ex-orange); border-bottom-color: var(--ex-orange); }
 .api-sig a.api-xref-plain { color: var(--ex-cream); }
 .api-doc > p:first-child { color: var(--ex-cream); }
+/* Per-class member cards (methods, properties, attributes), indented under the class. */
+.api-members { margin: 1.4rem 0 0; padding-left: 1.1rem; border-left: 1px solid var(--ex-rule); }
+.api-member { margin: 0 0 1.6rem; }
+.api-member:last-child { margin-bottom: 0; }
+.api-member .api-name { font-size: 1.05rem; }
 .api-disp { margin: 1.1rem 0; overflow-x: auto; color: var(--ex-cream); }
 .thrml-doc mjx-container { color: var(--ex-cream); }
 .thrml-doc mjx-container[display="true"] { margin: 1rem 0 !important; }

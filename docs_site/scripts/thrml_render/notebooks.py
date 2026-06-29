@@ -10,7 +10,10 @@ from .config import FIG_DIR
 
 
 def tag_hidden_inputs(nb):
-    """Mirror each cell's JupyterLab source_hidden state onto a hide-input tag."""
+    """Mirror each cell's JupyterLab source_hidden state onto a hide-input tag.
+
+    Mutates ``nb`` in place; the source ``.ipynb`` on disk is never touched.
+    """
     for cell in nb.cells:
         if cell.get("cell_type") != "code":
             continue
@@ -21,7 +24,6 @@ def tag_hidden_inputs(nb):
         if "hide-input" not in tags:
             tags.append("hide-input")
         cell.metadata["tags"] = tags
-    return nb
 
 
 def build_exporter():
