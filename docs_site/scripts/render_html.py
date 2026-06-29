@@ -69,6 +69,8 @@ def _fail_if_errors(errors, label):
 def copy_static():
     """Copy the file-backed assets the pages reference into rendered/."""
     FIG_DIR.mkdir(parents=True, exist_ok=True)
+    # The social-card image ships at the site root so og:image resolves to /og.png.
+    shutil.copy2(BRAND_DIR / "og.png", OUT_DIR / "og.png")
     # Figures committed beside notebooks or in the brand dir. The brand images
     # (flow.png, extropic_wordmark.png) are licensed assets served from the CDN
     # and intentionally absent from this public repo, so a missing source is
@@ -125,7 +127,7 @@ def main():
         body = rewrite_nb_links(body)
         body = fix_known_links(body)
         body = linkify_api(body)
-        body = inject_chrome(body, entries, active_stem=path.stem)
+        body = inject_chrome(body, entries, active_stem=path.stem, title=title)
         out = OUT_DIR / f"{path.stem}.html"
         out.write_text(body, encoding="utf-8")
         print(f"wrote {out.relative_to(ROOT)}  ({len(body) // 1024} KB)")

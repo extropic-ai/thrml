@@ -47,10 +47,17 @@ def site():
     return RENDERED
 
 
+def _published_notebook_pages():
+    """Rendered notebook page names: source stems minus SKIP_RENDER (the renderer
+    skips those, so globbing source notebooks alone would over-claim)."""
+    skip = _load("thrml_render.config").SKIP_RENDER
+    return [f"{p.stem}.html" for p in sorted(NOTEBOOKS.glob("[0-9]*.ipynb")) if p.stem not in skip]
+
+
 def test_core_pages_exist_and_nonempty(site):
     expected = ["index.html", "getting-started.html", "concepts.html", "examples.html", "llms.txt"]
     expected += [p.name for p in sorted(site.glob("api-*.html"))]
-    expected += [f"{p.stem}.html" for p in sorted(NOTEBOOKS.glob("[0-9]*.ipynb"))]
+    expected += _published_notebook_pages()
     assert len(list(site.glob("api-*.html"))) >= 1
     assert len(list(NOTEBOOKS.glob("[0-9]*.ipynb"))) >= 1
     for name in expected:
@@ -151,6 +158,38 @@ def test_callable_protocol_documents_dunder_call(site):
     # rendering must surface it rather than filtering it out as a dunder.
     html = (site / "api-observers.html").read_text(encoding="utf-8")
     assert 'id="AbstractObserver.__call__"' in html, "__call__ omitted from AbstractObserver members"
+
+
+def test_og_card_meta_on_rendered_pages(site):
+    # Every renderer-generated page carries Open Graph + Twitter-card tags pointing
+    # at the shared 1200x630 card, and the card ships at the site root. Static-copied
+    # pages (e.g. the paper redirect stub) are not templated, so they're excluded.
+    generated = ["index.html", "getting-started.html", "concepts.html", "examples.html"]
+    generated += [p.name for p in site.glob("api-*.html")]
+    generated += _published_notebook_pages()
+    for name in generated:
+        html = (site / name).read_text(encoding="utf-8")
+        assert 'property="og:image"' in html, f"missing og:image in {name}"
+        assert 'property="og:title"' in html, f"missing og:title in {name}"
+        assert '"twitter:card" content="summary_large_image"' in html, f"missing twitter card in {name}"
+        assert "https://docs.thrml.ai/og.png" in html, f"wrong og:image url in {name}"
+        # og:url canonicalizes per-page to the published host (homepage -> bare host)
+        expected_url = "https://docs.thrml.ai/" if name == "index.html" else f"https://docs.thrml.ai/{name}"
+        assert f'property="og:url" content="{expected_url}"' in html, f"wrong/missing og:url in {name}"
+    # the canonicalization also carries a real per-page title, not a constant
+    index_html = (site / "index.html").read_text(encoding="utf-8")
+    assert 'property="og:title" content="THRML · Thermodynamic Hypergraphical Models"' in index_html
+    og = site / "og.png"
+    assert og.exists() and og.stat().st_size > 0, "og.png not shipped to the site root"
+
+
+def test_og_meta_escapes_special_chars():
+    # og_meta must HTML-escape title/description so a notebook title with & " < >
+    # can't break out of the meta-tag content="..." attribute.
+    config = _load("thrml_render.config")
+    out = config.og_meta('A & B "q" <x>', "p.html")
+    assert "&amp;" in out and "&quot;" in out and "&lt;" in out and "&gt;" in out
+    assert "<x>" not in out
 
 
 def test_validate_catalog_tolerates_skip_render(monkeypatch):

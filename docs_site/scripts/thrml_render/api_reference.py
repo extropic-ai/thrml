@@ -72,13 +72,22 @@ _TYPE_NOISE_PATTERNS = (
     r"collections\.abc\.",
     r"equinox\._[\w.]+\.",
     r"thrml\.[\w.]+\.",
-    # ``\b`` so the leading ``jax`` of ``jaxtyping.`` (stripped above) is never
-    # mis-matched, which would fuse e.g. ``jaxtyping.PyTree`` into ``jaxPyTree``.
-    r"\btyping\.",
+    # Negative lookbehind (not ``\b``) so a leading ``jaxtyping.`` (handled above)
+    # or ``jax.typing.`` is never partially matched and fused (jaxPyTree / jax.).
+    r"(?<![\w.])typing\.",
 )
 
 
 def _strip_type_noise(s):
+    # ``<class 'pkg.Name'>`` -> ``pkg.Name`` (the module-path patterns below then
+    # trim the prefix). In _strip_type_noise so the signature and attribute paths
+    # share it and cannot diverge.
+    s = re.sub(r"<class '([^']+)'>", r"\1", s)
+    # a function default reprs as ``<function f at 0x...>`` (non-deterministic
+    # address -> non-reproducible build); reduce to the bare name, and strip any
+    # remaining ``at 0x...`` address from other object reprs.
+    s = re.sub(r"<function (\w+) at 0x[0-9a-fA-F]+>", r"\1", s)
+    s = re.sub(r" at 0x[0-9a-fA-F]+", "", s)
     for pat in _TYPE_NOISE_PATTERNS:
         s = re.sub(pat, "", s)
     return s
@@ -104,7 +113,6 @@ def _annotation_text(annotation):
     the long dotted paths.
     """
     s = annotation if isinstance(annotation, str) else str(annotation)
-    s = re.sub(r"<class '([^']+)'>", r"\1", s)
     return _strip_type_noise(s).strip()
 
 
@@ -183,7 +191,7 @@ def render_docstring(doc):
                 i += 1
             inner = _api_body("\n".join(body))
             for k, mx in enumerate(math_spans):
-                inner = inner.replace(f"\x00M{k}\x00", mx)
+                inner = inner.replace(f"\x00M{k}\x00", html_lib.escape(mx, quote=False))
             out.append(f'<div class="api-note"><span class="api-note-t">{_api_inline(title)}</span>{inner}</div>')
             continue
         if re.match(r"^\x00M\d+\x00$", ln):
@@ -215,7 +223,7 @@ def render_docstring(doc):
     close_list()
     res = "\n".join(out)
     for k, mx in enumerate(math_spans):
-        res = res.replace(f"\x00M{k}\x00", mx)
+        res = res.replace(f"\x00M{k}\x00", html_lib.escape(mx, quote=False))
     return res
 
 
@@ -338,7 +346,8 @@ def _render_member(cls, name, cls_name):
     elif isinstance(static, staticmethod):
         kind, sig = "staticmethod", _api_clean_sig(target)
     elif isinstance(static, classmethod):
-        kind, sig = "classmethod", _api_clean_sig(target)
+        # drop the bound ``cls`` the way the receiver is dropped for methods
+        kind, sig = "classmethod", re.sub(r"^\(cls(?:, )?", "(", _api_clean_sig(target))
     else:
         kind, sig = "method", _api_clean_sig(target)
     doc = inspect.getdoc(target) or ""
