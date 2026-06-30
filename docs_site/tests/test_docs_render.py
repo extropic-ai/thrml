@@ -200,3 +200,39 @@ def test_validate_catalog_tolerates_skip_render(monkeypatch):
     assert stems, "no example notebooks found"
     monkeypatch.setattr(config, "SKIP_RENDER", {stems[-1]})
     assert config.validate_notebook_catalog() == []
+
+
+def test_no_external_asset_cdn(site):
+    # Fonts/videos are served from the docs host; no Vercel/CDN refs leak through.
+    for page in site.rglob("*.html"):
+        text = page.read_text(encoding="utf-8")
+        rel = page.relative_to(site)
+        assert "vercel.app" not in text, f"vercel asset ref in {rel}"
+        assert "ASSET_BASE/" not in text, f"unresolved ASSET_BASE placeholder in {rel}"
+
+
+def test_fonts_referenced_relative(site):
+    # Generated pages reach the fonts page-relative; the static paper is two deep.
+    assert any("./fonts/" in p.read_text(encoding="utf-8") for p in site.glob("*.html"))
+    paper = (site / "papers" / "codon-optimization" / "index.html").read_text(encoding="utf-8")
+    assert "../../fonts/" in paper
+
+
+def test_copy_licensed_assets_from_checkout(tmp_path, monkeypatch):
+    # fonts/videos are copied from the docs-assets checkout; a missing
+    # checkout is skipped, not fatal.
+    render = _load("render_html")
+    checkout = tmp_path / "assets"
+    (checkout / "fonts").mkdir(parents=True)
+    (checkout / "videos").mkdir(parents=True)
+    (checkout / "fonts" / "suisse-intl-regular.woff2").write_bytes(b"f")
+    (checkout / "videos" / "extropic.mp4").write_bytes(b"v")
+    out = tmp_path / "rendered"
+    out.mkdir()
+    monkeypatch.setattr(render, "DOCS_ASSETS_DIR", checkout)
+    monkeypatch.setattr(render, "OUT_DIR", out)
+    render.copy_licensed_assets()
+    assert (out / "fonts" / "suisse-intl-regular.woff2").exists()
+    assert (out / "videos" / "extropic.mp4").exists()
+    monkeypatch.setattr(render, "DOCS_ASSETS_DIR", tmp_path / "absent")
+    render.copy_licensed_assets()

@@ -5,12 +5,12 @@ build:
   tools:
     python: "3.11"
   commands:
-    # Editable install so render_html.py can introspect the live thrml package
-    # for the API reference (also installs nbformat/nbconvert via the docs extra).
+    # Editable install so render_html.py can introspect the live thrml package.
     - pip install -e .[docs]
-    # Build the themed HTML (notebooks, prose pages, API reference, index,
-    # llms.txt) into docs_site/rendered/.
+    # Licensed fonts/videos from the private assets repo. DOCS_ASSETS_TOKEN is a
+    # read-only token set in the RTD project env; if it's missing the build still
+    # succeeds (pages fall back to system fonts).
+    - git clone --depth 1 "https://x-access-token:${DOCS_ASSETS_TOKEN}@github.com/extropic-ai/docs-assets.git" docs_site/_assets || echo "docs-assets unavailable; building without licensed fonts/videos"
     - python docs_site/scripts/render_html.py
-    # Publish the rendered site, including the brand fonts copied in at build time.
     - mkdir -p "$READTHEDOCS_OUTPUT/html"
     - cp -r docs_site/rendered/. "$READTHEDOCS_OUTPUT/html/"
