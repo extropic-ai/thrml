@@ -19,10 +19,8 @@ def _read(name):
 
 def css(blob):
     """Wrap raw CSS in a <style> block, resolving the ASSET_BASE/ placeholder in
-    @font-face urls to the configured CDN host.
-
-    Asserts the placeholder is fully resolved, so a malformed ASSET_BASE/ token
-    fails loudly at build time instead of shipping a broken font url."""
+    @font-face urls to the page-relative assets path. Raises if it survives, so a
+    broken asset path fails the build instead of shipping."""
     resolved = blob.replace("ASSET_BASE/", ASSET_BASE.rstrip("/") + "/")
     if "ASSET_BASE/" in resolved:
         raise RuntimeError("unresolved ASSET_BASE/ placeholder after substitution")

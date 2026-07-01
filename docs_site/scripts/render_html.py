@@ -35,6 +35,7 @@ from thrml_render.chrome import (
 from thrml_render.config import (
     API_CATEGORIES,
     BRAND_DIR,
+    DOCS_ASSETS_DIR,
     FIG_DIR,
     NB_DIR,
     OUT_DIR,
@@ -71,10 +72,7 @@ def copy_static():
     FIG_DIR.mkdir(parents=True, exist_ok=True)
     # The social-card image ships at the site root so og:image resolves to /og.png.
     shutil.copy2(BRAND_DIR / "og.png", OUT_DIR / "og.png")
-    # Figures committed beside notebooks or in the brand dir. The brand images
-    # (flow.png, extropic_wordmark.png) are licensed assets served from the CDN
-    # and intentionally absent from this public repo, so a missing source is
-    # skipped here (not a build error); the deploy mirror supplies them.
+    # Brand figures committed beside the notebooks (examples/) or in brand/.
     for src, dst in [
         (NB_DIR / "fps.png", FIG_DIR / "fps.png"),
         (NB_DIR / "codon_pipeline.png", FIG_DIR / "codon_pipeline.png"),
@@ -83,6 +81,7 @@ def copy_static():
     ]:
         if src.exists():
             shutil.copy2(src, dst)
+    copy_licensed_assets()
     # Committed static pages (e.g. the codon-optimization paper) copied verbatim,
     # so rendered/ holds them without a separate render step.
     if STATIC_DIR.is_dir():
@@ -91,6 +90,21 @@ def copy_static():
                 dst = OUT_DIR / src.relative_to(STATIC_DIR)
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, dst)
+
+
+def copy_licensed_assets():
+    """Copy licensed fonts/videos from the docs-assets checkout into
+    rendered/. Absent checkout (local/CI) -> skip; pages fall back to system fonts."""
+    for sub in ("fonts", "videos"):
+        src_dir = DOCS_ASSETS_DIR / sub
+        if not src_dir.is_dir():
+            print(f"licensed assets: no {src_dir}; skipping {sub}/")
+            continue
+        dst_dir = OUT_DIR / sub
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        for src in sorted(src_dir.iterdir()):
+            if src.is_file():
+                shutil.copy2(src, dst_dir / src.name)
 
 
 def main():

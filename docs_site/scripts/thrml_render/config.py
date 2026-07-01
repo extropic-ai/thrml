@@ -1,6 +1,7 @@
 """Paths, URLs, and pure-data configuration for the THRML docs build."""
 
 import html as html_lib
+import os
 import re
 from pathlib import Path
 
@@ -14,9 +15,14 @@ STATIC_DIR = ROOT / "static"
 
 INDEX_GITHUB = "https://github.com/extropic-ai/thrml"
 
-# Brand fonts and the hero/footer videos are licensed assets served from a CDN,
-# not committed to this public repo. Repoint ASSET_BASE at your preferred host.
-ASSET_BASE = "https://thrml-docs.vercel.app"
+# Licensed fonts/videos aren't committed (commercial license); the build copies
+# them from the private docs-assets checkout into rendered/ and serves them
+# page-relative (./fonts, ./videos) from the docs host -- no CDN. All pages live
+# at the output root, so a relative ref resolves on prod and RTD preview alike.
+ASSET_BASE = "."
+
+# docs-assets checkout; Read the Docs clones it here at build time.
+DOCS_ASSETS_DIR = Path(os.environ.get("THRML_DOCS_ASSETS") or (ROOT / "_assets"))
 
 
 # The THRML mark (Extropic brand). The source is monochrome; recoloring its fill
