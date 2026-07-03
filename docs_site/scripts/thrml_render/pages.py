@@ -4,8 +4,8 @@ import html as html_lib
 import importlib
 
 from pygments import highlight
-from pygments.lexers import get_lexer_by_name
 from pygments.formatters import HtmlFormatter
+from pygments.lexers import get_lexer_by_name
 
 from .api_reference import linkify_api
 from .assets import (
