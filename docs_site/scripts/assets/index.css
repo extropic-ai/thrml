@@ -139,7 +139,18 @@ a { color: var(--gold); text-decoration: none; }
 .codecard .copy.done { color: var(--gold); }
 .codecard pre { margin: 0; padding: .35rem 1.1rem 1rem; overflow-x: auto; color: var(--body);
   font-family: var(--mono); font-size: 12.5px; line-height: 1.78; }
-.codecard pre .cmt { color: #9a7a52; font-style: italic; }
+.codecard pre .c, .codecard pre .c1, .codecard pre .ch, .codecard pre .cm,
+.codecard pre .cp, .codecard pre .cpf, .codecard pre .cs { color: #9a7a52; font-style: italic; }
+.codecard pre .k, .codecard pre .kc, .codecard pre .kd, .codecard pre .kn,
+.codecard pre .kp, .codecard pre .kr, .codecard pre .kt, .codecard pre .ow { color: var(--gold); font-weight: 600; }
+.codecard pre .s, .codecard pre .sa, .codecard pre .sb, .codecard pre .sc, .codecard pre .dl,
+.codecard pre .sd, .codecard pre .s2, .codecard pre .se, .codecard pre .sh, .codecard pre .si,
+.codecard pre .sx, .codecard pre .sr, .codecard pre .s1, .codecard pre .ss { color: var(--solar); }
+.codecard pre .m, .codecard pre .mb, .codecard pre .mf, .codecard pre .mh,
+.codecard pre .mi, .codecard pre .mo, .codecard pre .il { color: var(--orange); font-weight: 600; }
+.codecard pre .nb, .codecard pre .nn, .codecard pre .bp,
+.codecard pre .o, .codecard pre .p, .codecard pre .pm { color: var(--muted); }
+.codecard pre .w { color: inherit; }
 .codecard pre .out { color: var(--muted); }
 
 /* examples: flat hairline cards */
