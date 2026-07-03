@@ -3,6 +3,10 @@
 import html as html_lib
 import importlib
 
+from pygments import highlight
+from pygments.lexers import get_lexer_by_name
+from pygments.formatters import HtmlFormatter
+
 from .api_reference import linkify_api
 from .assets import (
     COLLAPSE_SCRIPT,
@@ -33,12 +37,13 @@ from .config import (
 
 def code_card(code, lang="python"):
     """A self-contained docs code card matching the notebook code-cell look."""
-    esc = html_lib.escape(code.strip("\n"))
+    lexer = get_lexer_by_name(lang)
+    body = highlight(code.strip("\n"), lexer, HtmlFormatter(nowrap=True)).rstrip("\n")
     return (
         '<div class="thrml-codecard">'
         '<div class="thrml-code-head"><span class="thrml-lang">' + lang + "</span>"
         '<span class="thrml-tools"><button class="thrml-copy" type="button" title="Copy code" aria-label="Copy code"></button></span></div>'
-        "<pre><code>" + esc + "</code></pre>"
+        "<pre><code>" + body + "</code></pre>"
         "</div>"
     )
 
