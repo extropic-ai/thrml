@@ -25,9 +25,9 @@ output and is gitignored.
 - The example notebooks are single-sourced from the repo's `examples/`
   directory (`NB_DIR = ROOT.parent / "examples"`), so adding a notebook there
   publishes it on the site.
-- The brand fonts and the hero/footer videos are licensed assets served from a
-  CDN rather than committed here. Repoint `ASSET_BASE` in `thrml_render/config.py`
-  at your host.
+- The brand fonts and hero/footer videos are licensed; the build pulls them from
+  the private `docs-assets` repo (cloned into `docs_site/_assets`) and serves
+  them from the docs host, so no external CDN is referenced.
 
 ## Adding a public API symbol
 

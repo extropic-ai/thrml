@@ -1,5 +1,7 @@
 """Paths, URLs, and pure-data configuration for the THRML docs build."""
 
+import html as html_lib
+import os
 import re
 from pathlib import Path
 
@@ -13,9 +15,14 @@ STATIC_DIR = ROOT / "static"
 
 INDEX_GITHUB = "https://github.com/extropic-ai/thrml"
 
-# Brand fonts and the hero/footer videos are licensed assets served from a CDN,
-# not committed to this public repo. Repoint ASSET_BASE at your preferred host.
-ASSET_BASE = "https://thrml-docs.vercel.app"
+# Licensed fonts/videos aren't committed (commercial license); the build copies
+# them from the private docs-assets checkout into rendered/ and serves them
+# page-relative (./fonts, ./videos) from the docs host -- no CDN. All pages live
+# at the output root, so a relative ref resolves on prod and RTD preview alike.
+ASSET_BASE = "."
+
+# docs-assets checkout; Read the Docs clones it here at build time.
+DOCS_ASSETS_DIR = Path(os.environ.get("THRML_DOCS_ASSETS") or (ROOT / "_assets"))
 
 
 # The THRML mark (Extropic brand). The source is monochrome; recoloring its fill
@@ -222,3 +229,75 @@ SKIP_RENDER = set()
 
 
 SITE_URL = "https://docs.thrml.ai"
+
+
+def notebook_numbers(paths=None):
+    """Published notebook numbers (NN prefixes), in filesystem discovery order."""
+    if paths is None:
+        paths = sorted(NB_DIR.glob("[0-9]*.ipynb"))
+    return [p.stem.split("_", 1)[0] for p in paths if p.stem not in SKIP_RENDER]
+
+
+def validate_notebook_catalog(paths=None):
+    """Cross-check the notebooks on disk against INDEX_SECTIONS and INDEX_BLURBS.
+
+    Returns a list of human-readable error strings (empty when consistent) so the
+    build can fail loudly on a duplicated number, a notebook missing from the
+    sidebar catalog, or a blurb with no notebook, instead of silently dropping it
+    from the nav and the examples gallery.
+    """
+    # A SKIP_RENDER notebook is present on disk but kept off the site, so exclude
+    # its number from the catalog side too; otherwise the (still-listed) skipped
+    # notebook looks like a mismatch and would false-fail the build.
+    skip_numbers = {stem.split("_", 1)[0] for stem in SKIP_RENDER}
+    numbers = notebook_numbers(paths)  # already excludes SKIP_RENDER stems
+    section_numbers = [num for _name, _blurb, nums in INDEX_SECTIONS for num in nums if num not in skip_numbers]
+    blurb_numbers = set(INDEX_BLURBS) - skip_numbers
+    errors = []
+    if len(set(numbers)) != len(numbers):
+        errors.append(f"duplicate notebook numbers: {numbers}")
+    if len(set(section_numbers)) != len(section_numbers):
+        errors.append(f"duplicate INDEX_SECTIONS numbers: {section_numbers}")
+    if set(numbers) != set(section_numbers):
+        errors.append("notebook/catalog mismatch: " f"notebooks={sorted(numbers)}, catalog={sorted(section_numbers)}")
+    missing_blurbs = sorted(set(numbers) - blurb_numbers)
+    extra_blurbs = sorted(blurb_numbers - set(numbers))
+    if missing_blurbs:
+        errors.append(f"missing INDEX_BLURBS entries: {missing_blurbs}")
+    if extra_blurbs:
+        errors.append(f"INDEX_BLURBS entries without notebooks: {extra_blurbs}")
+    return errors
+
+
+DEFAULT_DESCRIPTION = (
+    "THRML is a JAX library for block Gibbs sampling of probabilistic hypergraphical "
+    "and energy-based models, built to prototype on Extropic's thermodynamic sampling hardware."
+)
+
+
+def og_meta(title, page, description=DEFAULT_DESCRIPTION):
+    """Open Graph + Twitter-card <head> tags for social link unfurls.
+
+    ``page`` is the rendered filename (e.g. ``index.html``); the canonical URL and
+    the shared 1200x630 card image are built against the live deploy host.
+    """
+    # Canonicalize to the published docs host; og.png ships into the site root.
+    base = SITE_URL.rstrip("/")
+    # the homepage's canonical URL is the bare host, not /index.html
+    url = f"{base}/" if page == "index.html" else f"{base}/{page}"
+    image = f"{base}/og.png"
+    title = html_lib.escape(title)
+    description = html_lib.escape(description)
+    return (
+        '<meta property="og:type" content="website">\n'
+        '<meta property="og:site_name" content="THRML">\n'
+        f'<meta property="og:title" content="{title}">\n'
+        f'<meta property="og:description" content="{description}">\n'
+        f'<meta property="og:url" content="{url}">\n'
+        f'<meta property="og:image" content="{image}">\n'
+        '<meta property="og:image:width" content="1200">\n'
+        '<meta property="og:image:height" content="630">\n'
+        # X/Twitter, Slack, and iMessage fall back to the og:* tags, so only
+        # twitter:card (which requests the large-image layout) is non-redundant.
+        '<meta name="twitter:card" content="summary_large_image">\n'
+    )

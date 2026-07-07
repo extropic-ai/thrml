@@ -27,6 +27,7 @@ from .config import (
     SITE_URL,
     SPECULATION_RULES,
     SPECULATION_RULES_INLINE,
+    og_meta,
 )
 
 
@@ -47,6 +48,7 @@ def write_doc_page(slug, title, inner, entries, active_page, *, mathjax=False, a
         '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f"<title>{title} &middot; THRML</title>\n"
+        + og_meta(f"{title} · THRML", f"{slug}.html")
         + "\n"
         + css(COLLAPSE_STYLE)
         + "\n"
@@ -78,18 +80,18 @@ def examples_inner(entries):
         "its outputs.</p>",
     ]
     for name, blurb, nums in INDEX_SECTIONS:
-        parts.append(f"<h2>{name}</h2>")
+        parts.append(f"<h2>{html_lib.escape(name, quote=False)}</h2>")
         if blurb:
-            parts.append(f"<p>{blurb}</p>")
+            parts.append(f"<p>{html_lib.escape(blurb, quote=False)}</p>")
         parts.append('<div class="thrml-cards">')
         for number in nums:
             if number not in by_num:
                 continue
             title, href = by_num[number]
             parts.append(
-                f'<a class="thrml-card2" href="{href}">'
-                f'<span class="c2t">{number} &middot; {title}</span>'
-                f'<span class="c2b">{INDEX_BLURBS.get(number, "")}</span></a>'
+                f'<a class="thrml-card2" href="{html_lib.escape(href, quote=True)}">'
+                f'<span class="c2t">{number} &middot; {html_lib.escape(title, quote=False)}</span>'
+                f'<span class="c2b">{html_lib.escape(INDEX_BLURBS.get(number, ""), quote=False)}</span></a>'
             )
         parts.append("</div>")
     return "\n".join(parts)
@@ -284,10 +286,10 @@ def write_index(entries):
         title, href = by_num[num]
         blurb = INDEX_BLURBS.get(num, "")
         return (
-            f'      <a class="card" href="{href}">'
+            f'      <a class="card" href="{html_lib.escape(href, quote=True)}">'
             f'<span class="card-num">{num}</span>'
-            f'<span class="card-title">{title}</span>'
-            f'<span class="card-blurb">{blurb}</span></a>'
+            f'<span class="card-title">{html_lib.escape(title, quote=False)}</span>'
+            f'<span class="card-blurb">{html_lib.escape(blurb, quote=False)}</span></a>'
         )
 
     featured_cards = "\n".join(card(n) for n in ("00", "01", "02") if n in by_num)
@@ -323,6 +325,7 @@ def write_index(entries):
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         "<title>THRML &middot; Thermodynamic Hypergraphical Models</title>\n"
         '<meta name="description" content="THRML is a JAX library for block Gibbs sampling of probabilistic hypergraphical models and energy-based models, built to prototype on Extropic\'s thermodynamic sampling hardware.">\n'
+        + og_meta("THRML · Thermodynamic Hypergraphical Models", "index.html")
         + css(INDEX_CSS)
         + "<style>@view-transition { navigation: auto; }</style>\n"
         + SPECULATION_RULES_INLINE
@@ -341,7 +344,7 @@ def write_index(entries):
 
   <section class="hero">
     <div class="hero-text">
-      <div class="hero-eyebrow"><img src="assets/extropic_wordmark.png" alt="Extropic"></div>
+      <div class="hero-eyebrow"><a href="https://extropic.ai"><img src="assets/extropic_wordmark.png" alt="Extropic"></a></div>
       <h1>Thermodynamic hypergraphical models</h1>
       <p class="tagline">THRML is a JAX library for block Gibbs sampling of hypergraphical and
       energy-based models. Build a model from nodes and many-body factors, divide it into blocks via
@@ -380,6 +383,10 @@ def write_index(entries):
 {featured_cards}
     </div>
     <a class="browse" href="{browse_href}">Browse all {n_examples} examples &rarr;</a>
+    <div class="apps-links" style="margin-top:1rem">
+      <a class="browse" href="https://github.com/pschilliOrange/dtm-replication">A larger project built on THRML: Denoising Thermodynamic Models &rarr;</a>
+      <a class="browse" href="https://arxiv.org/abs/2510.23972">Read the DTM paper (arXiv) &rarr;</a>
+    </div>
   </section>
 
   <section class="nb-wrap reveal" style="padding-top:3rem">
@@ -404,7 +411,7 @@ def write_index(entries):
       <source src="{ASSET_BASE}/videos/extropic-footer.mp4" type="video/mp4">
     </video>
     <div class="foot-inner">
-      <span>THRML &middot; EXTROPIC</span>
+      <span>THRML &middot; <a href="https://extropic.ai">EXTROPIC</a></span>
       <span><a href="{INDEX_GITHUB}">GitHub</a></span>
     </div>
   </footer>
@@ -437,6 +444,6 @@ def write_llms_txt(entries):
     out += ["", "## API reference"]
     for cat in API_CATEGORIES:
         mod = importlib.import_module(cat["module"])
-        present = ", ".join(s for s in cat["symbols"] if getattr(mod, s, None) is not None)
+        present = ", ".join(s for s in cat["symbols"] if hasattr(mod, s))
         out.append(f"- [{cat['label']}]({SITE_URL}/{cat['slug']}.html): {cat['blurb']} ({present})")
     (OUT_DIR / "llms.txt").write_text("\n".join(out) + "\n", encoding="utf-8")

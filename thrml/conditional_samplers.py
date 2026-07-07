@@ -173,7 +173,7 @@ class AbstractSoftmaxConditional(AbstractParametricConditionalSampler):
         sampler_state: None,
         output_sd: PyTree[jax.ShapeDtypeStruct],
     ) -> PyTree:
-        """A concrete implementation of this function has to return $\theta$ vector for every node
+        r"""A concrete implementation of this function has to return $\theta$ vector for every node
         in the block that is being updated. This array should have shape [b, M], where $M$ is the
         number of possible values that $X$ may take on."""
         pass
@@ -181,5 +181,5 @@ class AbstractSoftmaxConditional(AbstractParametricConditionalSampler):
     def sample_given_parameters(
         self, key: Key, parameters: PyTree, sampler_state: None, output_sd: PyTree[jax.ShapeDtypeStruct]
     ) -> tuple[_State, None]:
-        """Sample from a softmax distribution given the parameter vector $\theta$."""
+        r"""Sample from a softmax distribution given the parameter vector $\theta$."""
         return jax.random.categorical(key, parameters, axis=-1).astype(output_sd.dtype), sampler_state

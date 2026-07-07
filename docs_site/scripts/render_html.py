@@ -25,7 +25,7 @@ import html as html_lib
 import shutil
 
 import nbformat
-from thrml_render.api_reference import api_inner, linkify_api
+from thrml_render.api_reference import api_inner, linkify_api, validate_api_reference
 from thrml_render.chrome import (
     fix_known_links,
     inject_chrome,
@@ -35,12 +35,14 @@ from thrml_render.chrome import (
 from thrml_render.config import (
     API_CATEGORIES,
     BRAND_DIR,
+    DOCS_ASSETS_DIR,
     FIG_DIR,
     NB_DIR,
     OUT_DIR,
     ROOT,
     SKIP_RENDER,
     STATIC_DIR,
+    validate_notebook_catalog,
 )
 from thrml_render.notebooks import (
     build_exporter,
@@ -56,12 +58,21 @@ from thrml_render.pages import (
     write_index,
     write_llms_txt,
 )
+from thrml_render.text import replace_once
+
+
+def _fail_if_errors(errors, label):
+    if errors:
+        joined = "\n".join(f"- {error}" for error in errors)
+        raise RuntimeError(f"{label} failed:\n{joined}")
 
 
 def copy_static():
     """Copy the file-backed assets the pages reference into rendered/."""
     FIG_DIR.mkdir(parents=True, exist_ok=True)
-    # Figures committed beside notebooks or in the brand dir.
+    # The social-card image ships at the site root so og:image resolves to /og.png.
+    shutil.copy2(BRAND_DIR / "og.png", OUT_DIR / "og.png")
+    # Brand figures committed beside the notebooks (examples/) or in brand/.
     for src, dst in [
         (NB_DIR / "fps.png", FIG_DIR / "fps.png"),
         (NB_DIR / "codon_pipeline.png", FIG_DIR / "codon_pipeline.png"),
@@ -70,6 +81,7 @@ def copy_static():
     ]:
         if src.exists():
             shutil.copy2(src, dst)
+    copy_licensed_assets()
     # Committed static pages (e.g. the codon-optimization paper) copied verbatim,
     # so rendered/ holds them without a separate render step.
     if STATIC_DIR.is_dir():
@@ -80,8 +92,26 @@ def copy_static():
                 shutil.copy2(src, dst)
 
 
+def copy_licensed_assets():
+    """Copy licensed fonts/videos from the docs-assets checkout into
+    rendered/. Absent checkout (local/CI) -> skip; pages fall back to system fonts."""
+    for sub in ("fonts", "videos"):
+        src_dir = DOCS_ASSETS_DIR / sub
+        if not src_dir.is_dir():
+            print(f"licensed assets: no {src_dir}; skipping {sub}/")
+            continue
+        dst_dir = OUT_DIR / sub
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        for src in sorted(src_dir.iterdir()):
+            if src.is_file():
+                shutil.copy2(src, dst_dir / src.name)
+
+
 def main():
     OUT_DIR.mkdir(exist_ok=True)
+    # Fail loudly on a notebook/catalog mismatch; warn (don't fail) on API drift.
+    _fail_if_errors(validate_notebook_catalog(), "notebook catalog validation")
+    validate_api_reference()
     copy_static()
     exporter = build_exporter()
 
@@ -100,17 +130,18 @@ def main():
     for path, nb, _number, title in notebooks:
         tag_hidden_inputs(nb)
         body, _ = exporter.from_notebook_node(nb)
-        body = body.replace(
+        body = replace_once(
+            body,
             "<title>Notebook</title>",
             f"<title>{html_lib.escape(title)} &middot; THRML</title>",
-            1,
+            "notebook title marker",
         )
         body = externalize_images(body, path.stem)
         body = rewrite_local_images(body)
         body = rewrite_nb_links(body)
         body = fix_known_links(body)
         body = linkify_api(body)
-        body = inject_chrome(body, entries, active_stem=path.stem)
+        body = inject_chrome(body, entries, active_stem=path.stem, title=title)
         out = OUT_DIR / f"{path.stem}.html"
         out.write_text(body, encoding="utf-8")
         print(f"wrote {out.relative_to(ROOT)}  ({len(body) // 1024} KB)")
