@@ -2,6 +2,7 @@ import abc
 
 import equinox as eqx
 import jax.numpy as jnp
+from ihoop.eqx import AbstractStrictModule
 from jaxtyping import Array, Float
 
 from thrml.block_management import Block, BlockSpec, block_state_to_global
@@ -10,7 +11,7 @@ from thrml.factor import AbstractFactor
 from thrml.pgm import DEFAULT_NODE_SHAPE_DTYPES
 
 
-class AbstractEBM(eqx.Module):
+class AbstractEBM(AbstractStrictModule):
     """
     Something that has a well-defined energy function (map from a state to a scalar).
     """
@@ -31,7 +32,7 @@ class AbstractEBM(eqx.Module):
         raise NotImplementedError
 
 
-class EBMFactor(AbstractFactor):
+class AbstractEBMFactor(AbstractFactor):
     """A factor that defines an energy function."""
 
     @abc.abstractmethod
@@ -63,10 +64,7 @@ class AbstractFactorizedEBM(AbstractEBM):
         defines the global state that factors receive to compute energy.
     """
 
-    node_shape_dtypes: _SD
-
-    def __init__(self, node_shape_dtypes: _SD = DEFAULT_NODE_SHAPE_DTYPES):
-        self.node_shape_dtypes = node_shape_dtypes
+    node_shape_dtypes: eqx.AbstractVar[_SD]
 
     def energy(self, state: list[_State], blocks: list[Block]) -> Float[Array, ""]:
         block_spec = BlockSpec(blocks, self.node_shape_dtypes)
@@ -78,7 +76,7 @@ class AbstractFactorizedEBM(AbstractEBM):
 
     @property
     @abc.abstractmethod
-    def factors(self) -> list[EBMFactor]:
+    def factors(self) -> list[AbstractEBMFactor]:
         """A concrete implementation of this class must define this method that returns a list of factors that
         substantiate the EBM."""
         raise NotImplementedError
@@ -92,10 +90,11 @@ class FactorizedEBM(AbstractFactorizedEBM):
     - `_factors`: the list of factors that defines this EBM.
     """
 
-    _factors: list[EBMFactor]
+    node_shape_dtypes: _SD
+    _factors: list[AbstractEBMFactor]
 
-    def __init__(self, factors: list[EBMFactor], node_shape_dtypes: _SD = DEFAULT_NODE_SHAPE_DTYPES):
-        super().__init__(node_shape_dtypes)
+    def __init__(self, factors: list[AbstractEBMFactor], node_shape_dtypes: _SD = DEFAULT_NODE_SHAPE_DTYPES):
+        self.node_shape_dtypes = node_shape_dtypes
         self._factors = factors
 
     @property

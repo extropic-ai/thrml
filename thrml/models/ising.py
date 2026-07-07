@@ -1,20 +1,21 @@
 import equinox as eqx
 import jax
 from jax import numpy as jnp
-from jaxtyping import Array, Bool, Key
+from jaxtyping import Array, Bool, Key, PyTree
 
 from thrml.block_sampling import (
+    _SD,
+    AbstractBlockSamplingProgram,
     Block,
     BlockGibbsSpec,
-    BlockSamplingProgram,
     SamplingSchedule,
     SuperBlock,
-    sample_with_observation,
 )
-from thrml.factor import FactorSamplingProgram
+from thrml.conditional_samplers import AbstractConditionalSampler
+from thrml.factor import _compile_from_factors
 from thrml.models.discrete_ebm import SpinEBMFactor, SpinGibbsConditional
-from thrml.models.ebm import AbstractFactorizedEBM, EBMFactor
-from thrml.observers import MomentAccumulatorObserver
+from thrml.models.ebm import AbstractEBMFactor, AbstractFactorizedEBM
+from thrml.observers import MomentAccumulatorObserver, sample_with_observation
 from thrml.pgm import AbstractNode
 
 Edge = tuple[AbstractNode, AbstractNode]
@@ -44,6 +45,7 @@ class IsingEBM(AbstractFactorizedEBM):
     edges: list[Edge]
     weights: Array
     beta: Array
+    node_shape_dtypes: _SD
 
     def __init__(self, nodes: list[AbstractNode], edges: list[Edge], biases: Array, weights: Array, beta: Array):
         """Initialize an Ising EBM.
@@ -57,9 +59,7 @@ class IsingEBM(AbstractFactorizedEBM):
         - `beta`: Temperature parameter
         """
         # nodes should be same type, should be at least one node passed in
-        sd_map = {nodes[0].__class__: jax.ShapeDtypeStruct((), jnp.bool_)}
-
-        super().__init__(sd_map)
+        self.node_shape_dtypes = {nodes[0].__class__: jax.ShapeDtypeStruct((), jnp.bool_)}
 
         self.nodes = nodes
         self.edges = edges
@@ -68,7 +68,7 @@ class IsingEBM(AbstractFactorizedEBM):
         self.biases = biases
 
     @property
-    def factors(self) -> list[EBMFactor]:
+    def factors(self) -> list[AbstractEBMFactor]:
         return [
             SpinEBMFactor([Block(self.nodes)], self.beta * self.biases),
             SpinEBMFactor(
@@ -77,8 +77,15 @@ class IsingEBM(AbstractFactorizedEBM):
         ]
 
 
-class IsingSamplingProgram(FactorSamplingProgram):
-    """A very thin wrapper on FactorSamplingProgram that specializes it to the case of an Ising Model."""
+class IsingSamplingProgram(AbstractBlockSamplingProgram):
+    """A specialization of a factor-based sampling program to the case of an Ising Model."""
+
+    gibbs_spec: BlockGibbsSpec
+    samplers: list[AbstractConditionalSampler]
+    per_block_interactions: list[list[PyTree]]
+    per_block_interaction_active: list[list[Array]]
+    per_block_interaction_global_inds: list[list[list[int]]]
+    per_block_interaction_global_slices: list[list[list[Array]]]
 
     def __init__(self, ebm: IsingEBM, free_blocks: list[SuperBlock], clamped_blocks: list[Block]):
         """Initialize an Ising sampling program.
@@ -90,10 +97,17 @@ class IsingSamplingProgram(FactorSamplingProgram):
         - `clamped_blocks`: List of blocks that are held fixed
         """
         samp = SpinGibbsConditional()
-
         spec = BlockGibbsSpec(free_blocks, clamped_blocks, ebm.node_shape_dtypes)
+        samplers = [samp for _ in spec.free_blocks]
 
-        super().__init__(spec, [samp for _ in spec.free_blocks], ebm.factors, [])
+        self.gibbs_spec = spec
+        self.samplers = samplers
+        (
+            self.per_block_interactions,
+            self.per_block_interaction_active,
+            self.per_block_interaction_global_inds,
+            self.per_block_interaction_global_slices,
+        ) = _compile_from_factors(spec, samplers, ebm.factors, [])
 
 
 class IsingTrainingSpec(eqx.Module):
@@ -175,7 +189,7 @@ def estimate_moments(
     key: Key[Array, ""],
     first_moment_nodes: list[AbstractNode],
     second_moment_edges: list[Edge],
-    program: BlockSamplingProgram,
+    program: AbstractBlockSamplingProgram,
     schedule: SamplingSchedule,
     init_state: list[Array],
     clamped_data: list[Array],
@@ -187,7 +201,7 @@ def estimate_moments(
         key: the jax PRNG key
         first_moment_nodes: the nodes that represent the variables we want to estimate the first moments of
         second_moment_edges: the edges that connect the variables we want to estimate the second moments of
-        program: the `BlockSamplingProgram` to be used for sampling
+        program: the `AbstractBlockSamplingProgram` to be used for sampling
         schedule: the schedule to use for sampling
         init_state: the variable values to use to initialize the sampling
         clamped_data: the variable values to assign to the clamped nodes

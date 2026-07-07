@@ -4,19 +4,20 @@ from typing import Type
 import equinox as eqx
 import jax
 import numpy as np
+from ihoop.eqx import AbstractStrictModule
 from jax import numpy as jnp
 from jaxtyping import Array, Key, PyTree
 
 from thrml.block_management import Block, BlockSpec, from_global_state
 from thrml.block_sampling import _State
-from thrml.conditional_samplers import BernoulliConditional, SoftmaxConditional
-from thrml.factor import WeightedFactor
+from thrml.conditional_samplers import AbstractBernoulliConditional, AbstractSoftmaxConditional
+from thrml.factor import AbstractWeightedFactor
 from thrml.interaction import InteractionGroup
-from thrml.models.ebm import EBMFactor
+from thrml.models.ebm import AbstractEBMFactor
 from thrml.pgm import AbstractNode
 
 
-class DiscreteEBMInteraction(eqx.Module):
+class DiscreteEBMInteraction(AbstractStrictModule):
     """An interaction that shows up when sampling from discrete-variable EBMs.
 
     **Attributes:**
@@ -54,7 +55,34 @@ def _batch_gather(x, *idx):
     return x_flat[(batch_idx,) + idx_flat].reshape(batch_shape)
 
 
-class DiscreteEBMFactor(EBMFactor, WeightedFactor):
+def _derive(
+    spin_node_groups: list[Block], categorical_node_groups: list[Block], weights: Array
+) -> tuple[list[Block], dict[Type[AbstractNode], bool]]:
+    """Validate the node groups and weight tensor, and derive `node_groups` and `is_spin`."""
+    is_spin = defaultdict(lambda: False)
+
+    # remember which node types are spin
+    for group in spin_node_groups:
+        is_spin[type(group.nodes[0])] = True
+
+    for group in categorical_node_groups:
+        curr_type = type(group.nodes[0])
+        if is_spin[curr_type]:
+            raise RuntimeError("A node cannot be both categorical and spin.")
+        is_spin[curr_type] = False
+
+    if not len(weights.shape) == 1 + len(categorical_node_groups):
+        raise RuntimeError(
+            "The shape of the weight tensor must be [b, x_1, ..., x_k], where"
+            "k is the length of categorical_node_groups."
+        )
+
+    # don't want this to recognize nodes that haven't been seen here
+    # not sure how that would happen but better to be careful
+    return spin_node_groups + categorical_node_groups, dict(is_spin)
+
+
+class AbstractDiscreteEBMFactor(AbstractEBMFactor, AbstractWeightedFactor):
     """Implements batches of energy function terms of the form s_1 * ... * s_M * W[c_1, ..., c_N],
     where the s_i are spin variables and the c_i are categorical variables.
 
@@ -76,51 +104,11 @@ class DiscreteEBMFactor(EBMFactor, WeightedFactor):
     - `is_spin`: a map that indicates if a given node type represents a spin-valued random variable or not.
     """
 
-    spin_node_groups: list[Block]
-    categorical_node_groups: list[Block]
-    weights: Array
-    is_spin: dict[Type[AbstractNode], bool]
+    spin_node_groups: eqx.AbstractVar[list[Block]]
+    categorical_node_groups: eqx.AbstractVar[list[Block]]
+    is_spin: eqx.AbstractVar[dict[Type[AbstractNode], bool]]
 
-    def __init__(self, spin_node_groups: list[Block], categorical_node_groups: list[Block], weights: Array):
-        """
-        Create a `DiscreteEBMFactor`.
-
-        **Arguments:**
-
-        - `spin_node_groups`: The spin node groups
-        - `categorical_node_groups`: The categorical node groups
-        - `weights`: The interaction weight tensor
-        """
-
-        WeightedFactor.__init__(self, weights, spin_node_groups + categorical_node_groups)
-
-        is_spin = defaultdict(lambda: False)
-
-        # remember which node types are spin
-        for group in spin_node_groups:
-            is_spin[type(group.nodes[0])] = True
-
-        for group in categorical_node_groups:
-            curr_type = type(group.nodes[0])
-            if is_spin[curr_type]:
-                raise RuntimeError("A node cannot be both categorical and spin.")
-            is_spin[curr_type] = False
-
-        # don't want this to recognize nodes that haven't been seen here
-        # not sure how that would happen but better to be careful
-        self.is_spin = dict(is_spin)
-        self.spin_node_groups = spin_node_groups
-        self.categorical_node_groups = categorical_node_groups
-
-        if not len(weights.shape) == 1 + len(categorical_node_groups):
-            raise RuntimeError(
-                "The shape of the weight tensor must be [b, x_1, ..., x_k], where"
-                "k is the length of categorical_node_groups."
-            )
-
-        self.weights = weights
-
-    def to_interaction_groups(self) -> list[InteractionGroup]:
+    def _base_interaction_groups(self) -> list[InteractionGroup]:
         """Produce interaction groups that implement this factor.
 
         In this case, we have to treat the spin and categorical node groups slightly differently.
@@ -191,6 +179,33 @@ class DiscreteEBMFactor(EBMFactor, WeightedFactor):
         return -jnp.sum(weights * spin_prod.astype(weights.dtype))
 
 
+class DiscreteEBMFactor(AbstractDiscreteEBMFactor):
+    """A discrete factor that produces one interaction group per choice of head-node block."""
+
+    spin_node_groups: list[Block]
+    categorical_node_groups: list[Block]
+    weights: Array
+    is_spin: dict[Type[AbstractNode], bool]
+    node_groups: list[Block]
+
+    def __init__(self, spin_node_groups: list[Block], categorical_node_groups: list[Block], weights: Array):
+        """Create a `DiscreteEBMFactor`.
+
+        **Arguments:**
+
+        - `spin_node_groups`: The spin node groups
+        - `categorical_node_groups`: The categorical node groups
+        - `weights`: The interaction weight tensor
+        """
+        self.spin_node_groups = spin_node_groups
+        self.categorical_node_groups = categorical_node_groups
+        self.weights = weights
+        self.node_groups, self.is_spin = _derive(spin_node_groups, categorical_node_groups, weights)
+
+    def to_interaction_groups(self) -> list[InteractionGroup]:
+        return self._base_interaction_groups()
+
+
 def _merge_groups(groups, n_tail_groups):
     if len(groups) == 0:
         return groups
@@ -213,7 +228,7 @@ def _merge_groups(groups, n_tail_groups):
     ]
 
 
-class SquareDiscreteEBMFactor(DiscreteEBMFactor):
+class SquareDiscreteEBMFactor(AbstractDiscreteEBMFactor):
     """A discrete factor with a square interaction weight tensor (shape [b, x, x, ..., x]).
 
     If a discrete factor is square, the interaction groups corresponding to different choices of the head
@@ -221,9 +236,18 @@ class SquareDiscreteEBMFactor(DiscreteEBMFactor):
     more efficient use of accelerators.
     """
 
+    spin_node_groups: list[Block]
+    categorical_node_groups: list[Block]
+    weights: Array
+    is_spin: dict[Type[AbstractNode], bool]
+    node_groups: list[Block]
+
     def __init__(self, spin_node_groups: list[Block], categorical_node_groups: list[Block], weights: Array):
         """Enforce that the weights are actually square."""
-        super().__init__(spin_node_groups, categorical_node_groups, weights)
+        self.spin_node_groups = spin_node_groups
+        self.categorical_node_groups = categorical_node_groups
+        self.weights = weights
+        self.node_groups, self.is_spin = _derive(spin_node_groups, categorical_node_groups, weights)
 
         if len(weights.shape) > 2:
             target_shape = weights.shape[1]
@@ -232,8 +256,8 @@ class SquareDiscreteEBMFactor(DiscreteEBMFactor):
                     raise RuntimeError("Interaction tensor is not square.")
 
     def to_interaction_groups(self) -> list[InteractionGroup]:
-        """Call the parent class to_interaction_groups, and merge the results."""
-        groups = super().to_interaction_groups()
+        """Produce the base interaction groups and merge those that share head-node block structure."""
+        groups = self._base_interaction_groups()
 
         spin_groups = []
         cat_groups = []
@@ -249,25 +273,19 @@ class SquareDiscreteEBMFactor(DiscreteEBMFactor):
         return _merge_groups(spin_groups, n_tail) + _merge_groups(cat_groups, n_tail)
 
 
-class SpinEBMFactor(SquareDiscreteEBMFactor):
+def SpinEBMFactor(node_groups: list[Block], weights: Array) -> SquareDiscreteEBMFactor:
     """A `DiscreteEBMFactor` that involves only spin variables."""
-
-    def __init__(self, node_groups: list[Block], weights: Array):
-        super().__init__(node_groups, [], weights)
+    return SquareDiscreteEBMFactor(node_groups, [], weights)
 
 
-class CategoricalEBMFactor(DiscreteEBMFactor):
+def CategoricalEBMFactor(node_groups: list[Block], weights: Array) -> DiscreteEBMFactor:
     """A `DiscreteEBMFactor` that involves only categorical variables."""
-
-    def __init__(self, node_groups: list[Block], weights: Array):
-        super().__init__([], node_groups, weights)
+    return DiscreteEBMFactor([], node_groups, weights)
 
 
-class SquareCategoricalEBMFactor(SquareDiscreteEBMFactor):
+def SquareCategoricalEBMFactor(node_groups: list[Block], weights: Array) -> SquareDiscreteEBMFactor:
     """A `DiscreteEBMFactor` that involves only categorical variables that also has a square weight tensor."""
-
-    def __init__(self, node_groups: list[Block], weights: Array):
-        super().__init__([], node_groups, weights)
+    return SquareDiscreteEBMFactor([], node_groups, weights)
 
 
 def _batch_gather_with_k(x, *idx):
@@ -303,14 +321,9 @@ def _split_states(states, n_spin):
     return states_spin, states_cat
 
 
-class SpinGibbsConditional(BernoulliConditional):
+class SpinGibbsConditional(AbstractBernoulliConditional):
     r"""A conditional update for spin-valued random variables that will perform a Gibbs sampling update given one or
-    more `DiscreteEBMInteractions`.
-
-    This function can be extended to handle a broader class of interactions via inheritance. Specifically, a
-    child class can override the `compute_parameters` method defined here, compute contributions to $\gamma$
-    from other types of interactions, and then call this method to take into account the contributions from
-    `DiscreteEBMInteractions`."""
+    more `DiscreteEBMInteractions`."""
 
     def compute_parameters(
         self,
@@ -344,13 +357,13 @@ class SpinGibbsConditional(BernoulliConditional):
                 raise RuntimeError("Unsupported interaction found")
         return gamma, sampler_state
 
+    def init(self) -> None:
+        return None
 
-class CategoricalGibbsConditional(SoftmaxConditional):
+
+class CategoricalGibbsConditional(AbstractSoftmaxConditional):
     """A conditional update for categorical random variables that will perform a Gibbs sampling update given one or
         more `DiscreteEBMInteractions`.
-
-    This function can be extended to handle other interactions in the same way as
-    [`thrml.models.SpinGibbsConditional`][].
 
     **Attributes:**
 
@@ -391,3 +404,6 @@ class CategoricalGibbsConditional(SoftmaxConditional):
                 raise RuntimeError("Unsupported interaction found")
 
         return theta, sampler_state
+
+    def init(self) -> None:
+        return None

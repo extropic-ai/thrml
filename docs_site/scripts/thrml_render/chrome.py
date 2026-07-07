@@ -141,7 +141,9 @@ def inject_chrome(html, entries, active_stem, title):
         # </main> in a notebook cell's raw-HTML output can't misplace the nav
         idx = html.rfind("</main>")
         if idx == -1:
-            raise RuntimeError("expected a </main> marker, found none")
+            idx = html.rfind("</body>")
+            if idx == -1:
+                raise RuntimeError("expected a </main> or </body> marker, found none")
         html = html[:idx] + nav + html[idx:]
     return replace_once(html, "</body>", "\n" + js(COLLAPSE_SCRIPT) + SPECULATION_RULES + "</body>", "</body> marker")
 

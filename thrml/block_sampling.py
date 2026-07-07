@@ -5,6 +5,7 @@ from typing import Mapping, Sequence, Type, TypeAlias
 import equinox as eqx
 import jax
 import numpy as np
+from ihoop.eqx import AbstractStrictModule
 from jax import numpy as jnp
 from jaxtyping import Array, Key, PyTree, Shaped
 
@@ -13,7 +14,6 @@ from thrml.interaction import InteractionGroup
 from thrml.pgm import DEFAULT_NODE_SHAPE_DTYPES, AbstractNode
 
 from .conditional_samplers import AbstractConditionalSampler, _SamplerState
-from .observers import AbstractObserver, ObserveCarry, StateObserver
 
 # A SuperBlock is a collection of blocks that will be sampled at the same "time"
 # specifically, they will be sampled separately, but without updating the state
@@ -108,10 +108,127 @@ def _tree_slice(x, sl):
     return x
 
 
-class BlockSamplingProgram(eqx.Module):
-    """A PGM block-sampling program.
+def _compile(
+    gibbs_spec: BlockGibbsSpec,
+    samplers: list[AbstractConditionalSampler],
+    interaction_groups: list[InteractionGroup],
+) -> tuple[list[list[PyTree]], list[list[Array]], list[list[list[int]]], list[list[list[Array]]]]:
+    """Compile a list of `InteractionGroup`s into the per-block representation a program runs on.
 
-    This class encapsulates everything that is needed to run a PGM block sampling program in THRML.
+    This code is the beating heart of THRML, and the chance that you should be
+    modifying it or trying to understand it deeply are very low (as this would
+    basically correspond to re-writing the library). This code takes in a set of
+    information that implicitly defines a sampling program and manipulates it into
+    a shape that is appropriate for practical vectorized block-sampling program.
+    This involves reindexing, slicing, and often padding.
+
+    **Arguments:**
+
+    - `gibbs_spec`: A division of some PGM into free and clamped blocks.
+    - `samplers`: The update rule to use for each free block in `gibbs_spec`.
+    - `interaction_groups`: A list of `InteractionGroups` that define how the
+        variables in your sampling program affect one another.
+
+    **Returns:**
+
+    The tuple `(per_block_interactions, per_block_interaction_active, per_block_interaction_global_inds,
+    per_block_interaction_global_slices)`.
+    """
+
+    n_free_blocks = len(gibbs_spec.free_blocks)
+    if len(samplers) != n_free_blocks:
+        raise ValueError(f"Expected {n_free_blocks} samplers, received {len(samplers)}")
+
+    # first, construct a map from every head node to each interaction it
+    # shows up in and where it shows up in that interaction
+
+    head_node_map = defaultdict(list)
+
+    for i, interaction_group in enumerate(interaction_groups):
+        for j, node in enumerate(interaction_group.head_nodes.nodes):
+            head_node_map[node].append((i, j))
+
+    # now, let's organize this information on the interactions into a block format
+
+    interaction_inds = []
+    max_n_interactions = []
+
+    for block in gibbs_spec.free_blocks:
+        this_block_interaction_info = [[[] for _ in range(len(block.nodes))] for _ in range(len(interaction_groups))]
+        for j, node in enumerate(block.nodes):
+            this_node_interaction_info = head_node_map[node]
+            for info in this_node_interaction_info:
+                this_block_interaction_info[info[0]][j].append(info[1])
+        interaction_inds.append(this_block_interaction_info)
+        this_max_n = [max([len(x) for x in this_int]) for this_int in this_block_interaction_info]
+        max_n_interactions.append(this_max_n)
+
+    # now, take the block-arranged interaction structure and use it to construct the block-arranged interactions
+    # and slicers for the global state
+
+    per_block_interactions = []
+    per_block_interaction_active = []
+    per_block_interaction_global_inds = []
+    per_block_interaction_global_slices = []
+
+    for block, block_interact_inds, block_n_interactions in zip(
+        gibbs_spec.free_blocks, interaction_inds, max_n_interactions
+    ):
+        this_block_interactions = []
+        this_block_active = []
+        this_block_global_inds = []
+        this_block_global_slices = []
+        for interaction_group, interact_inds, n_interactions in zip(
+            interaction_groups, block_interact_inds, block_n_interactions
+        ):
+            if n_interactions > 0:
+                n_nodes = len(block.nodes)
+                interaction_slices = np.zeros((n_nodes, n_interactions), dtype=int)
+
+                global_inds = []
+                global_slices = []
+                for tail_block in interaction_group.tail_nodes:
+                    global_inds.append(gibbs_spec.node_global_location_map[tail_block.nodes[0]][0])
+                    global_slices.append(np.zeros((n_nodes, n_interactions), dtype=int))
+
+                active = np.zeros((n_nodes, n_interactions), dtype=bool)
+                for i, inds in enumerate(interact_inds):
+                    for j, ind in enumerate(inds):
+                        interaction_slices[i, j] = ind
+                        active[i, j] = 1
+
+                        for k, tail_block in enumerate(interaction_group.tail_nodes):
+                            s = gibbs_spec.node_global_location_map[tail_block.nodes[ind]][1]
+                            global_slices[k][i, j] = s
+
+                interaction_slices = jnp.array(interaction_slices)
+
+                sliced_interaction = jax.tree.map(
+                    lambda x: _tree_slice(x, interaction_slices),  # shape -> (n, m, …)
+                    interaction_group.interaction,
+                )
+
+                this_block_interactions.append(sliced_interaction)
+                this_block_active.append(jnp.array(active))
+                this_block_global_inds.append(global_inds)
+                this_block_global_slices.append([jnp.array(x) for x in global_slices])
+        per_block_interactions.append(this_block_interactions)
+        per_block_interaction_active.append(this_block_active)
+        per_block_interaction_global_inds.append(this_block_global_inds)
+        per_block_interaction_global_slices.append(this_block_global_slices)
+
+    return (
+        per_block_interactions,
+        per_block_interaction_active,
+        per_block_interaction_global_inds,
+        per_block_interaction_global_slices,
+    )
+
+
+class AbstractBlockSamplingProgram(AbstractStrictModule):
+    """Abstract base for PGM block-sampling programs.
+
+    A block-sampling program encapsulates everything that is needed to run a PGM block sampling routine in THRML.
     `per_block_interactions` and `per_block_interaction_active` are parallel to the free blocks in `gibbs_spec`, and
     their members are passed directly to a sampler when the state of the corresponding free block is being updated
     during a sampling program. `per_block_interaction_global_inds` and `per_block_interaction_global_slices` are
@@ -133,6 +250,17 @@ class BlockSamplingProgram(eqx.Module):
         required to update each block
     """
 
+    gibbs_spec: eqx.AbstractVar[BlockGibbsSpec]
+    samplers: eqx.AbstractVar[list[AbstractConditionalSampler]]
+    per_block_interactions: eqx.AbstractVar[list[list[PyTree]]]
+    per_block_interaction_active: eqx.AbstractVar[list[list[Array]]]
+    per_block_interaction_global_inds: eqx.AbstractVar[list[list[list[int]]]]
+    per_block_interaction_global_slices: eqx.AbstractVar[list[list[list[Array]]]]
+
+
+class BlockSamplingProgram(AbstractBlockSamplingProgram):
+    """A PGM block-sampling program built directly from a list of `InteractionGroup`s."""
+
     gibbs_spec: BlockGibbsSpec
     samplers: list[AbstractConditionalSampler]
     per_block_interactions: list[list[PyTree]]
@@ -148,13 +276,6 @@ class BlockSamplingProgram(eqx.Module):
     ):
         """Construct a `BlockSamplingProgram`.
 
-        This code is the beating heart of THRML, and the chance that you should be
-        modifying it or trying to understand it deeply are very low (as this would
-        basically correspond to re-writing the library). This code takes in a set of
-        information that implicitly defines a sampling program and manipulates it into
-        a shape that is appropriate for practical vectorized block-sampling program.
-        This involves reindexing, slicing, and often padding.
-
         **Arguments:**
 
         - `gibbs_spec`: A division of some PGM into free and clamped blocks.
@@ -162,100 +283,14 @@ class BlockSamplingProgram(eqx.Module):
         - `interaction_groups`: A list of `InteractionGroups` that define how the
             variables in your sampling program affect one another.
         """
-
         self.gibbs_spec = gibbs_spec
         self.samplers = samplers
-
-        n_free_blocks = len(self.gibbs_spec.free_blocks)
-        if len(self.samplers) != n_free_blocks:
-            raise ValueError(f"Expected {n_free_blocks} samplers, received {len(self.samplers)}")
-
-        # first, construct a map from every head node to each interaction it
-        # shows up in and where it shows up in that interaction
-
-        head_node_map = defaultdict(list)
-
-        for i, interaction_group in enumerate(interaction_groups):
-            for j, node in enumerate(interaction_group.head_nodes.nodes):
-                head_node_map[node].append((i, j))
-
-        # now, let's organize this information on the interactions into a block format
-
-        interaction_inds = []
-        max_n_interactions = []
-
-        for block in gibbs_spec.free_blocks:
-            this_block_interaction_info = [
-                [[] for _ in range(len(block.nodes))] for _ in range(len(interaction_groups))
-            ]
-            for j, node in enumerate(block.nodes):
-                this_node_interaction_info = head_node_map[node]
-                for info in this_node_interaction_info:
-                    this_block_interaction_info[info[0]][j].append(info[1])
-            interaction_inds.append(this_block_interaction_info)
-            this_max_n = [max([len(x) for x in this_int]) for this_int in this_block_interaction_info]
-            max_n_interactions.append(this_max_n)
-
-        # now, take the block-arranged interaction structure and use it to construct the block-arranged interactions
-        # and slicers for the global state
-
-        # if you are reading this, god help you
-
-        per_block_interactions = []
-        per_block_interaction_active = []
-        per_block_interaction_global_inds = []
-        per_block_interaction_global_slices = []
-
-        for block, block_interact_inds, block_n_interactions in zip(
-            gibbs_spec.free_blocks, interaction_inds, max_n_interactions
-        ):
-            this_block_interactions = []
-            this_block_active = []
-            this_block_global_inds = []
-            this_block_global_slices = []
-            for interaction_group, interact_inds, n_interactions in zip(
-                interaction_groups, block_interact_inds, block_n_interactions
-            ):
-                if n_interactions > 0:
-                    n_nodes = len(block.nodes)
-                    interaction_slices = np.zeros((n_nodes, n_interactions), dtype=int)
-
-                    global_inds = []
-                    global_slices = []
-                    for tail_block in interaction_group.tail_nodes:
-                        global_inds.append(gibbs_spec.node_global_location_map[tail_block.nodes[0]][0])
-                        global_slices.append(np.zeros((n_nodes, n_interactions), dtype=int))
-
-                    active = np.zeros((n_nodes, n_interactions), dtype=bool)
-                    for i, inds in enumerate(interact_inds):
-                        for j, ind in enumerate(inds):
-                            interaction_slices[i, j] = ind
-                            active[i, j] = 1
-
-                            for k, tail_block in enumerate(interaction_group.tail_nodes):
-                                s = gibbs_spec.node_global_location_map[tail_block.nodes[ind]][1]
-                                global_slices[k][i, j] = s
-
-                    interaction_slices = jnp.array(interaction_slices)
-
-                    sliced_interaction = jax.tree.map(
-                        lambda x: _tree_slice(x, interaction_slices),  # shape -> (n, m, …)
-                        interaction_group.interaction,
-                    )
-
-                    this_block_interactions.append(sliced_interaction)
-                    this_block_active.append(jnp.array(active))
-                    this_block_global_inds.append(global_inds)
-                    this_block_global_slices.append([jnp.array(x) for x in global_slices])
-            per_block_interactions.append(this_block_interactions)
-            per_block_interaction_active.append(this_block_active)
-            per_block_interaction_global_inds.append(this_block_global_inds)
-            per_block_interaction_global_slices.append(this_block_global_slices)
-
-        self.per_block_interactions = per_block_interactions
-        self.per_block_interaction_active = per_block_interaction_active
-        self.per_block_interaction_global_inds = per_block_interaction_global_inds
-        self.per_block_interaction_global_slices = per_block_interaction_global_slices
+        (
+            self.per_block_interactions,
+            self.per_block_interaction_active,
+            self.per_block_interaction_global_inds,
+            self.per_block_interaction_global_slices,
+        ) = _compile(gibbs_spec, samplers, interaction_groups)
 
 
 _State: TypeAlias = PyTree[Shaped[Array, "nodes ?*state"], "_State"]
@@ -265,7 +300,7 @@ def sample_single_block(
     key: Key[Array, ""],
     state_free: list[_State],
     clamp_state: list[_State],
-    program: BlockSamplingProgram,
+    program: AbstractBlockSamplingProgram,
     block: int,
     sampler_state: _SamplerState,
     global_state: list[PyTree] | None = None,
@@ -338,7 +373,7 @@ def sample_blocks(
     key: Key[Array, ""],
     state_free: list[_State],
     clamp_state: list[_State],
-    program: BlockSamplingProgram,
+    program: AbstractBlockSamplingProgram,
     sampler_state: list[_SamplerState],
 ) -> tuple[list[_State], list[_SamplerState]]:
     """Perform one iteration of sampling, visiting every block.
@@ -378,7 +413,7 @@ def sample_blocks(
 
 def _run_blocks(
     key: Key[Array, ""],
-    program: BlockSamplingProgram,
+    program: AbstractBlockSamplingProgram,
     init_chain_state: list[PyTree[Shaped[Array, "nodes ?*state"]]],
     state_clamp: list[_State],
     n_iters: int,
@@ -417,115 +452,3 @@ class SamplingSchedule:
 
     def __hash__(self) -> int:
         return hash((self.n_warmup, self.n_samples, self.steps_per_sample))
-
-
-def sample_with_observation(
-    key: Key[Array, ""],
-    program: BlockSamplingProgram,
-    schedule: SamplingSchedule,
-    init_chain_state: list[PyTree[Shaped[Array, "nodes ?*state"]]],
-    state_clamp: list[_State],
-    observation_carry_init: ObserveCarry,
-    f_observe: AbstractObserver,
-) -> tuple[ObserveCarry, list[PyTree[Shaped[Array, "n_samples nodes ?*state"]]]]:
-    """Run the full chain and call an Observer after every recorded sample.
-
-    **Arguments:**
-
-    - `key`: RNG key.
-    - `program`: The sampling program.
-    - `schedule`: Warm-up length, number of samples, number of steps between samples.
-    - `init_chain_state`: Initial free-block state.
-    - `state_clamp`: Clamped-block state.
-    - `observation_carry_init`: Initial carry handed to `f_observe`.
-    - `f_observe`: Observer instance.
-
-    **Returns:**
-
-    - Tuple `(final_observer_carry, samples)` where `samples` is a PyTree whose
-        leading axis has size `schedule.n_samples`.
-    """
-    # run warmup
-    sampler_states = jax.tree.map(
-        lambda x: x.init(),
-        program.samplers,
-        is_leaf=lambda a: isinstance(a, AbstractConditionalSampler),
-    )
-    key, subkey = jax.random.split(key, 2)
-    warmup_state, warmup_sampler_states = _run_blocks(
-        subkey,
-        program,
-        init_chain_state,
-        state_clamp,
-        schedule.n_warmup,
-        sampler_states,
-    )
-    mem, warmup_observation = f_observe(program, warmup_state, state_clamp, observation_carry_init, jnp.array(0))
-
-    if schedule.n_samples <= 1:
-        warmup_observation = jax.tree.map(lambda x: x[None], warmup_observation)
-        return mem, warmup_observation
-
-    # collect samples
-
-    def body_fn(carry, input):
-        (prev_state, prev_sampler_state), _mem = carry
-
-        _key, i = input
-
-        new_state, new_sampler_state = _run_blocks(
-            _key,
-            program,
-            prev_state,
-            state_clamp,
-            schedule.steps_per_sample,
-            prev_sampler_state,
-        )
-        _mem, observe_out = f_observe(program, new_state, state_clamp, _mem, i)
-        new_carry = ((new_state, new_sampler_state), _mem)
-        return new_carry, observe_out
-
-    keys = jax.random.split(key, schedule.n_samples - 1)
-    outer_iters = jnp.arange(1, schedule.n_samples)
-
-    inputs = (keys, outer_iters)
-
-    (_, mem_out), observed_results = jax.lax.scan(body_fn, ((warmup_state, warmup_sampler_states), mem), inputs)
-
-    # need to prepend the first observation from the warmup
-    def prepend_warmup_observation(_warmup, _rest):
-        return jnp.concatenate([_warmup[None], _rest], axis=0)
-
-    observed_results = jax.tree.map(prepend_warmup_observation, warmup_observation, observed_results)
-
-    return mem_out, observed_results
-
-
-def sample_states(
-    key: Key[Array, ""],
-    program: BlockSamplingProgram,
-    schedule: SamplingSchedule,
-    init_state_free: list[PyTree[Shaped[Array, "nodes ?*state"]]],
-    state_clamp: list[_State],
-    nodes_to_sample: list[Block],
-) -> list[PyTree[Shaped[Array, "n_samples nodes ?*state"]]]:
-    """Convenience wrapper to collect state information for *nodes_to_sample* only.
-
-    Internally builds a [`thrml.StateObserver`][], runs
-    [`thrml.sample_with_observation`][], and returns a stacked tensor of shape
-    `(schedule.n_samples, ...)`.
-    """
-    f_observe = StateObserver(nodes_to_sample)
-    carry_init = f_observe.init()
-
-    mem_out, results_out = sample_with_observation(
-        key,
-        program,
-        schedule,
-        init_state_free,
-        state_clamp,
-        carry_init,
-        f_observe,
-    )
-
-    return results_out

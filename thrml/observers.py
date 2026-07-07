@@ -1,24 +1,22 @@
 import abc
 from collections import defaultdict
-from typing import TYPE_CHECKING, Callable, Sequence, TypeVar
+from typing import Callable, Sequence, TypeVar
 
-import equinox as eqx
 import jax
 import numpy as np
+from ihoop.eqx import AbstractStrictModule
 from jax import numpy as jnp
-from jaxtyping import Array, Int, PyTree
+from jaxtyping import Array, Int, Key, PyTree, Shaped
 
 from thrml.block_management import Block, block_state_to_global, from_global_state
-
-if TYPE_CHECKING:
-    from thrml.block_sampling import _State, BlockSamplingProgram
-
+from thrml.block_sampling import AbstractBlockSamplingProgram, SamplingSchedule, _run_blocks, _State
+from thrml.conditional_samplers import AbstractConditionalSampler
 from thrml.pgm import AbstractNode
 
 ObserveCarry = TypeVar("ObserveCarry", bound=PyTree)
 
 
-class AbstractObserver(eqx.Module):
+class AbstractObserver(AbstractStrictModule):
     """
     Interface for objects that inspect the sampling program while it is running.
 
@@ -30,7 +28,7 @@ class AbstractObserver(eqx.Module):
     @abc.abstractmethod
     def __call__(
         self,
-        program: "BlockSamplingProgram",
+        program: AbstractBlockSamplingProgram,
         state_free: list[PyTree[Array]],
         state_clamped: list[PyTree[Array]],
         carry: ObserveCarry,
@@ -58,9 +56,10 @@ class AbstractObserver(eqx.Module):
         """
         return NotImplemented
 
+    @abc.abstractmethod
     def init(self) -> PyTree:
-        """Initialize the memory for the observer. Defaults to None."""
-        return None
+        """Initialize the memory for the observer."""
+        raise NotImplementedError
 
 
 class StateObserver(AbstractObserver):
@@ -76,9 +75,9 @@ class StateObserver(AbstractObserver):
 
     def __call__(
         self,
-        program: "BlockSamplingProgram",
-        state_free: list["_State"],
-        state_clamped: list["_State"],
+        program: AbstractBlockSamplingProgram,
+        state_free: list[_State],
+        state_clamped: list[_State],
         carry: None,
         iteration: Int[Array, ""],
     ) -> tuple[None, PyTree]:
@@ -86,6 +85,9 @@ class StateObserver(AbstractObserver):
         global_state = block_state_to_global(state_free + state_clamped, program.gibbs_spec)
         sampled_state = from_global_state(global_state, program.gibbs_spec, self.blocks_to_sample)
         return None, sampled_state
+
+    def init(self) -> None:
+        return None
 
 
 def _f_identity(*x):
@@ -101,7 +103,6 @@ class MomentAccumulatorObserver(AbstractObserver):
     of some state variables,
 
     $$\sum_i f(x_1^i) f(x_2^i) \dots f(x_N^i)$$
-
 
 
     **Attributes:**
@@ -196,7 +197,7 @@ class MomentAccumulatorObserver(AbstractObserver):
 
     def __call__(
         self,
-        program: "BlockSamplingProgram",
+        program: AbstractBlockSamplingProgram,
         state_free: list[PyTree[Array]],
         state_clamped: list[PyTree[Array]],
         carry: list[Array],
@@ -232,3 +233,115 @@ class MomentAccumulatorObserver(AbstractObserver):
             lambda x: jnp.zeros(x.shape[:1], dtype=float),
             self.flat_to_full_moment_slices,
         )
+
+
+def sample_with_observation(
+    key: Key[Array, ""],
+    program: AbstractBlockSamplingProgram,
+    schedule: SamplingSchedule,
+    init_chain_state: list[PyTree[Shaped[Array, "nodes ?*state"]]],
+    state_clamp: list[_State],
+    observation_carry_init: ObserveCarry,
+    f_observe: AbstractObserver,
+) -> tuple[ObserveCarry, list[PyTree[Shaped[Array, "n_samples nodes ?*state"]]]]:
+    """Run the full chain and call an Observer after every recorded sample.
+
+    **Arguments:**
+
+    - `key`: RNG key.
+    - `program`: The sampling program.
+    - `schedule`: Warm-up length, number of samples, number of steps between samples.
+    - `init_chain_state`: Initial free-block state.
+    - `state_clamp`: Clamped-block state.
+    - `observation_carry_init`: Initial carry handed to `f_observe`.
+    - `f_observe`: Observer instance.
+
+    **Returns:**
+
+    - Tuple `(final_observer_carry, samples)` where `samples` is a PyTree whose
+        leading axis has size `schedule.n_samples`.
+    """
+    # run warmup
+    sampler_states = jax.tree.map(
+        lambda x: x.init(),
+        program.samplers,
+        is_leaf=lambda a: isinstance(a, AbstractConditionalSampler),
+    )
+    key, subkey = jax.random.split(key, 2)
+    warmup_state, warmup_sampler_states = _run_blocks(
+        subkey,
+        program,
+        init_chain_state,
+        state_clamp,
+        schedule.n_warmup,
+        sampler_states,
+    )
+    mem, warmup_observation = f_observe(program, warmup_state, state_clamp, observation_carry_init, jnp.array(0))
+
+    if schedule.n_samples <= 1:
+        warmup_observation = jax.tree.map(lambda x: x[None], warmup_observation)
+        return mem, warmup_observation
+
+    # collect samples
+
+    def body_fn(carry, input):
+        (prev_state, prev_sampler_state), _mem = carry
+
+        _key, i = input
+
+        new_state, new_sampler_state = _run_blocks(
+            _key,
+            program,
+            prev_state,
+            state_clamp,
+            schedule.steps_per_sample,
+            prev_sampler_state,
+        )
+        _mem, observe_out = f_observe(program, new_state, state_clamp, _mem, i)
+        new_carry = ((new_state, new_sampler_state), _mem)
+        return new_carry, observe_out
+
+    keys = jax.random.split(key, schedule.n_samples - 1)
+    outer_iters = jnp.arange(1, schedule.n_samples)
+
+    inputs = (keys, outer_iters)
+
+    (_, mem_out), observed_results = jax.lax.scan(body_fn, ((warmup_state, warmup_sampler_states), mem), inputs)
+
+    # need to prepend the first observation from the warmup
+    def prepend_warmup_observation(_warmup, _rest):
+        return jnp.concatenate([_warmup[None], _rest], axis=0)
+
+    observed_results = jax.tree.map(prepend_warmup_observation, warmup_observation, observed_results)
+
+    return mem_out, observed_results
+
+
+def sample_states(
+    key: Key[Array, ""],
+    program: AbstractBlockSamplingProgram,
+    schedule: SamplingSchedule,
+    init_state_free: list[PyTree[Shaped[Array, "nodes ?*state"]]],
+    state_clamp: list[_State],
+    nodes_to_sample: list[Block],
+) -> list[PyTree[Shaped[Array, "n_samples nodes ?*state"]]]:
+    """Convenience wrapper to collect state information for nodes_to_sample only.
+
+    Internally builds a [`thrml.StateObserver`][], runs
+    [`thrml.sample_with_observation`][], and returns a stacked tensor of shape
+    `(schedule.n_samples, ...)`.
+    """
+    f_observe = StateObserver(nodes_to_sample)
+    carry_init = f_observe.init()
+
+    mem_out, results_out = sample_with_observation(
+        key,
+        program,
+        schedule,
+        init_state_free,
+        state_clamp,
+        carry_init,
+        f_observe,
+    )
+
+    return results_out

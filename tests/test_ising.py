@@ -5,8 +5,9 @@ import jax
 import networkx as nx
 from jax import numpy as jnp
 
+from thrml import sample_with_observation
 from thrml.block_management import Block
-from thrml.block_sampling import SamplingSchedule, sample_with_observation
+from thrml.block_sampling import SamplingSchedule
 from thrml.models.ising import (
     IsingEBM,
     IsingSamplingProgram,
