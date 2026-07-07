@@ -38,7 +38,24 @@
 .thrml-codecard pre { margin: 0; background: transparent; border: 0; padding: .35rem 1.05rem 1rem; overflow-x: auto;
   color: var(--ex-ink); font-family: var(--jp-code-font-family); font-size: 13px; line-height: 1.7; }
 .thrml-codecard pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
-.thrml-codecard pre .cmt { color: #A8845A; font-style: italic; }
+.thrml-codecard pre code .c, .thrml-codecard pre code .c1, .thrml-codecard pre code .ch,
+.thrml-codecard pre code .cm, .thrml-codecard pre code .cp, .thrml-codecard pre code .cpf,
+.thrml-codecard pre code .cs { color: #A8845A; font-style: italic; }
+.thrml-codecard pre code .k, .thrml-codecard pre code .kc, .thrml-codecard pre code .kd,
+.thrml-codecard pre code .kn, .thrml-codecard pre code .kp, .thrml-codecard pre code .kr,
+.thrml-codecard pre code .kt, .thrml-codecard pre code .ow { color: var(--ex-gold); font-weight: 600; }
+.thrml-codecard pre code .s, .thrml-codecard pre code .sa, .thrml-codecard pre code .sb,
+.thrml-codecard pre code .sc, .thrml-codecard pre code .dl, .thrml-codecard pre code .sd,
+.thrml-codecard pre code .s2, .thrml-codecard pre code .se, .thrml-codecard pre code .sh,
+.thrml-codecard pre code .si, .thrml-codecard pre code .sx, .thrml-codecard pre code .sr,
+.thrml-codecard pre code .s1, .thrml-codecard pre code .ss { color: var(--ex-amber); }
+.thrml-codecard pre code .m, .thrml-codecard pre code .mb, .thrml-codecard pre code .mf,
+.thrml-codecard pre code .mh, .thrml-codecard pre code .mi, .thrml-codecard pre code .mo,
+.thrml-codecard pre code .il { color: var(--ex-orange); font-weight: 600; }
+.thrml-codecard pre code .nb, .thrml-codecard pre code .nn, .thrml-codecard pre code .bp { color: var(--ex-tan); }
+.thrml-codecard pre code .nc, .thrml-codecard pre code .nf, .thrml-codecard pre code .fm { color: var(--ex-math); }
+.thrml-codecard pre code .o, .thrml-codecard pre code .p, .thrml-codecard pre code .pm { color: var(--ex-muted); }
+.thrml-codecard pre code .w { color: inherit; }
 /* next-step cards */
 .thrml-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 1.4rem 0 .4rem; }
 .thrml-card2 { display: block; border: 1px solid var(--ex-copper); border-radius: 2px; padding: 1rem 1.15rem;

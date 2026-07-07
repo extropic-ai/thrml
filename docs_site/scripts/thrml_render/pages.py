@@ -3,6 +3,10 @@
 import html as html_lib
 import importlib
 
+from pygments import highlight
+from pygments.formatters import HtmlFormatter
+from pygments.lexers import get_lexer_by_name
+
 from .api_reference import linkify_api
 from .assets import (
     COLLAPSE_SCRIPT,
@@ -33,12 +37,13 @@ from .config import (
 
 def code_card(code, lang="python"):
     """A self-contained docs code card matching the notebook code-cell look."""
-    esc = html_lib.escape(code.strip("\n"))
+    lexer = get_lexer_by_name(lang)
+    body = highlight(code.strip("\n"), lexer, HtmlFormatter(nowrap=True)).rstrip("\n")
     return (
         '<div class="thrml-codecard">'
         '<div class="thrml-code-head"><span class="thrml-lang">' + lang + "</span>"
         '<span class="thrml-tools"><button class="thrml-copy" type="button" title="Copy code" aria-label="Copy code"></button></span></div>'
-        "<pre><code>" + esc + "</code></pre>"
+        "<pre><code>" + body + "</code></pre>"
         "</div>"
     )
 
@@ -296,23 +301,30 @@ def write_index(entries):
     n_examples = len(entries)
 
     copy_btn = '<button class="copy" type="button" aria-label="Copy code">' + COPY_SVG + "</button>"
-    first_model_card = (
-        '<div class="codecard"><div class="chead"><span>python</span>' + copy_btn + "</div>"
-        "<pre>import jax, jax.numpy as jnp\n"
+    quick_code = (
+        "import jax, jax.numpy as jnp\n"
         "from thrml import SpinNode, Block, SamplingSchedule, sample_states\n"
-        "from thrml.models import IsingEBM, IsingSamplingProgram, hinton_init\n\n"
-        '<span class="cmt"># A 5-spin Ising chain, two-coloured into parallel blocks</span>\n'
+        "from thrml.models import IsingEBM, IsingSamplingProgram, hinton_init\n"
+        "\n"
+        "# A 5-spin Ising chain, two-coloured into parallel blocks\n"
         "nodes = [SpinNode() for _ in range(5)]\n"
         "edges = [(nodes[i], nodes[i + 1]) for i in range(4)]\n"
         "model = IsingEBM(\n"
-        "    nodes, edges, jnp.zeros((5,)), jnp.ones((4,)) * 0.5, jnp.array(1.0))\n\n"
+        "    nodes, edges, jnp.zeros((5,)), jnp.ones((4,)) * 0.5, jnp.array(1.0))\n"
+        "\n"
         "free_blocks = [Block(nodes[::2]), Block(nodes[1::2])]\n"
-        "program = IsingSamplingProgram(model, free_blocks, clamped_blocks=[])\n\n"
+        "program = IsingSamplingProgram(model, free_blocks, clamped_blocks=[])\n"
+        "\n"
         "k_init, k_samp = jax.random.split(jax.random.key(0), 2)\n"
         "state = hinton_init(k_init, model, free_blocks, ())\n"
         "schedule = SamplingSchedule(n_warmup=100, n_samples=1000, steps_per_sample=2)\n"
         "samples = sample_states(\n"
-        "    k_samp, program, schedule, state, [], [Block(nodes)])\n"
+        "    k_samp, program, schedule, state, [], [Block(nodes)])"
+    )
+    quick_highlighted = highlight(quick_code, get_lexer_by_name("python"), HtmlFormatter(nowrap=True)).rstrip("\n")
+    first_model_card = (
+        '<div class="codecard"><div class="chead"><span>python</span>' + copy_btn + "</div>"
+        "<pre>" + quick_highlighted + "\n"
         '<span class="out"># samples: 1000 draws from the chain, by block Gibbs</span></pre></div>'
     )
 

@@ -44,7 +44,8 @@ development = [
 ]
 docs = [
   "nbformat>=5.9",
-  "nbconvert>=7.0"
+  "nbconvert>=7.0",
+  "pygments>=2.13"
 ]
 
 [tool.setuptools]
