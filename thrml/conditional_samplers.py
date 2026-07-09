@@ -3,6 +3,7 @@ from typing import TypeVar
 
 import equinox as eqx
 import jax
+from jax import numpy as jnp
 from jaxtyping import Array, Key, PyTree, Shaped
 
 _State = PyTree[Shaped[Array, "nodes ?*state"], "State"]
@@ -181,4 +182,12 @@ class SoftmaxConditional(AbstractParametricConditionalSampler):
         self, key: Key, parameters: PyTree, sampler_state: None, output_sd: PyTree[jax.ShapeDtypeStruct]
     ) -> tuple[_State, None]:
         r"""Sample from a softmax distribution given the parameter vector $\theta$."""
+        n_categories = parameters.shape[-1]
+        dtype_info = jnp.iinfo(output_sd.dtype)
+        max_categories = dtype_info.max + 1
+        if n_categories > max_categories:
+            raise RuntimeError(
+                f"n_categories={n_categories} exceeds what dtype {output_sd.dtype} can represent "
+                f"pass a wider integer dtype via node_shape_dtypes."
+            )
         return jax.random.categorical(key, parameters, axis=-1).astype(output_sd.dtype), sampler_state

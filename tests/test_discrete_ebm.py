@@ -419,6 +419,31 @@ class TestBlockSample(unittest.TestCase):
 
         self.assertTrue(np.allclose(samps_true, samps))
 
+    def test_categorical_uint8_rejects_too_many_categories(self):
+        key = jax.random.key(342)
+
+        n_cats = 300
+
+        block_1 = Block([CategoricalNode()])
+
+        weights = jnp.full((1, n_cats), -1000.0).at[0, 280].set(1000.0)
+
+        factor = CategoricalEBMFactor([block_1], weights)
+
+        gibbs_spec = BlockGibbsSpec([block_1], [])
+
+        samp = CategoricalGibbsConditional(n_cats)
+
+        prog = FactorSamplingProgram(gibbs_spec, [samp], [factor], [])
+
+        state = [jnp.zeros((1,), dtype=jnp.uint8)]
+
+        with self.assertRaises(RuntimeError) as error:
+            sample_single_block(key, state, [], prog, 0, None)
+
+        self.assertIn("n_categories=300", str(error.exception))
+        self.assertIn("uint8", str(error.exception))
+
     def test_categorical_triplet(self):
         """Test sampling for the case of a three-body categorical interaction where two of the nodes in each
         interaction are clamped. This makes sure all the slicing code is working properly."""
