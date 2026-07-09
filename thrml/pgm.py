@@ -78,7 +78,7 @@ class SpinNode(AbstractNode):
 
 class CategoricalNode(AbstractNode):
     """A node that represents a random variable that may take on any one of K possible discrete states,
-    represented by a positive integer in (0, K]."""
+    represented by an integer in [0, K)."""
 
     pass
 
