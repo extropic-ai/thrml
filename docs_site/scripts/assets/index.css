@@ -205,3 +205,5 @@ a { color: var(--gold); text-decoration: none; }
 @media (max-width: 360px) {
   .hero h1 { font-size: 22px; }
 }
+/* Read the Docs injects a version flyout; the site is single-version, so hide it. */
+readthedocs-flyout { display: none; }
