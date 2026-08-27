@@ -30,6 +30,16 @@ or
 uv pip install thrml
 ```
 
+### NumPy compatibility
+
+THRML is compatible with NumPy 2.x when paired with a modern JAX release (JAX ≥ 0.5; the current release line works out of the box). Older JAX releases (< 0.5) had known incompatibilities with NumPy 2 — if you are pinned to an older JAX and see NumPy-related import or runtime errors, constrain NumPy in your own environment:
+
+```bash
+pip install "numpy<2"
+```
+
+See [issue #19](https://github.com/extropic-ai/thrml/issues/19) for context.
+
 ## Documentation
 
 Available at [docs.thrml.ai](https://docs.thrml.ai/en/latest/).
