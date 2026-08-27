@@ -175,9 +175,9 @@ class MomentAccumulatorObserver(AbstractObserver):
                         idx = len(flat_nodes_list)
                         node_to_flat_idx[node] = idx
                         flat_nodes_list.append(node)
+                        nodes_by_type[node.__class__].append(node)
+                        flat_to_type_slices[node.__class__].append(idx)
                     moment_slice[j, k] = idx
-                    nodes_by_type[node.__class__].append(node)
-                    flat_to_type_slices[node.__class__].append(node_to_flat_idx[node])
 
             flat_to_full_moment_slices.append(jnp.array(moment_slice, dtype=int))
 
