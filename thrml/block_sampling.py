@@ -1,5 +1,4 @@
 import dataclasses
-from collections import defaultdict
 from typing import Mapping, Sequence, Type, TypeAlias
 
 import equinox as eqx
@@ -170,31 +169,57 @@ class BlockSamplingProgram(eqx.Module):
         if len(self.samplers) != n_free_blocks:
             raise ValueError(f"Expected {n_free_blocks} samplers, received {len(self.samplers)}")
 
-        # first, construct a map from every head node to each interaction it
-        # shows up in and where it shows up in that interaction
+        node_index: dict[AbstractNode, int] = {}
+        for interaction_group in interaction_groups:
+            for node in interaction_group.head_nodes.nodes:
+                if node not in node_index:
+                    node_index[node] = len(node_index)
+        for block in gibbs_spec.free_blocks:
+            for node in block.nodes:
+                if node not in node_index:
+                    node_index[node] = len(node_index)
 
-        head_node_map = defaultdict(list)
+        head_index = [
+            np.fromiter(
+                (node_index[n] for n in interaction_group.head_nodes.nodes),
+                dtype=np.intp,
+                count=len(interaction_group.head_nodes.nodes),
+            )
+            for interaction_group in interaction_groups
+        ]
 
-        for i, interaction_group in enumerate(interaction_groups):
-            for j, node in enumerate(interaction_group.head_nodes.nodes):
-                head_node_map[node].append((i, j))
+        # Scatter coordinates per (free block, interaction group): rows index the block,
+        # cols rank a node's interactions, heads index the group's head nodes.
 
-        # now, let's organize this information on the interactions into a block format
-
-        interaction_inds = []
+        interaction_scatter = []
         max_n_interactions = []
+        position_in_block = np.full(len(node_index), -1, dtype=np.intp)
 
         for block in gibbs_spec.free_blocks:
-            this_block_interaction_info = [
-                [[] for _ in range(len(block.nodes))] for _ in range(len(interaction_groups))
-            ]
-            for j, node in enumerate(block.nodes):
-                this_node_interaction_info = head_node_map[node]
-                for info in this_node_interaction_info:
-                    this_block_interaction_info[info[0]][j].append(info[1])
-            interaction_inds.append(this_block_interaction_info)
-            this_max_n = [max([len(x) for x in this_int]) for this_int in this_block_interaction_info]
+            n_nodes = len(block.nodes)
+            block_index = np.fromiter((node_index[n] for n in block.nodes), dtype=np.intp, count=n_nodes)
+            position_in_block[block_index] = np.arange(n_nodes, dtype=np.intp)
+
+            this_block_scatter = []
+            this_max_n = []
+            for group_heads in head_index:
+                position = position_in_block[group_heads]
+                touches_block = position >= 0
+                unsorted_rows = position[touches_block]
+                unsorted_heads = np.flatnonzero(touches_block)
+                # Sort must be stable: each node's interactions stay in head-position order.
+                order = np.argsort(unsorted_rows, kind="stable")
+                rows = unsorted_rows[order]
+                heads = unsorted_heads[order]
+                counts = np.bincount(rows, minlength=n_nodes)
+                cols = np.arange(rows.size, dtype=np.intp) - np.repeat(np.cumsum(counts) - counts, counts)
+                this_block_scatter.append((rows, cols, heads))
+                this_max_n.append(int(counts.max()) if counts.size else 0)
+            interaction_scatter.append(this_block_scatter)
             max_n_interactions.append(this_max_n)
+
+            # Scratch array, reused across blocks; entries return to -1.
+            position_in_block[block_index] = -1
 
         # now, take the block-arranged interaction structure and use it to construct the block-arranged interactions
         # and slicers for the global state
@@ -206,35 +231,44 @@ class BlockSamplingProgram(eqx.Module):
         per_block_interaction_global_inds = []
         per_block_interaction_global_slices = []
 
-        for block, block_interact_inds, block_n_interactions in zip(
-            gibbs_spec.free_blocks, interaction_inds, max_n_interactions
+        # Global slot of every tail node, keyed by tail block.
+        tail_slots: dict[Block, np.ndarray] = {}
+        for interaction_group in interaction_groups:
+            for tail_block in interaction_group.tail_nodes:
+                if tail_block not in tail_slots:
+                    tail_block_nodes = tail_block.nodes
+                    tail_slots[tail_block] = np.fromiter(
+                        (gibbs_spec.node_global_location_map[n][1] for n in tail_block_nodes),
+                        dtype=np.intp,
+                        count=len(tail_block_nodes),
+                    )
+
+        for block, block_scatter, block_n_interactions in zip(
+            gibbs_spec.free_blocks, interaction_scatter, max_n_interactions
         ):
             this_block_interactions = []
             this_block_active = []
             this_block_global_inds = []
             this_block_global_slices = []
-            for interaction_group, interact_inds, n_interactions in zip(
-                interaction_groups, block_interact_inds, block_n_interactions
+            for interaction_group, (rows, cols, heads), n_interactions in zip(
+                interaction_groups, block_scatter, block_n_interactions
             ):
                 if n_interactions > 0:
                     n_nodes = len(block.nodes)
+
                     interaction_slices = np.zeros((n_nodes, n_interactions), dtype=int)
+                    interaction_slices[rows, cols] = heads
+
+                    active = np.zeros((n_nodes, n_interactions), dtype=bool)
+                    active[rows, cols] = True
 
                     global_inds = []
                     global_slices = []
                     for tail_block in interaction_group.tail_nodes:
                         global_inds.append(gibbs_spec.node_global_location_map[tail_block.nodes[0]][0])
-                        global_slices.append(np.zeros((n_nodes, n_interactions), dtype=int))
-
-                    active = np.zeros((n_nodes, n_interactions), dtype=bool)
-                    for i, inds in enumerate(interact_inds):
-                        for j, ind in enumerate(inds):
-                            interaction_slices[i, j] = ind
-                            active[i, j] = 1
-
-                            for k, tail_block in enumerate(interaction_group.tail_nodes):
-                                s = gibbs_spec.node_global_location_map[tail_block.nodes[ind]][1]
-                                global_slices[k][i, j] = s
+                        slices = np.zeros((n_nodes, n_interactions), dtype=int)
+                        slices[rows, cols] = tail_slots[tail_block][heads]
+                        global_slices.append(slices)
 
                     interaction_slices = jnp.array(interaction_slices)
 
