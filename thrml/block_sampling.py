@@ -105,6 +105,9 @@ class BlockGibbsSpec(BlockSpec):
         self.sampling_order = sampling_order
         self.superblocks = superblocks
 
+    def _value_key(self) -> tuple:
+        return (super()._value_key(), tuple(self.superblocks), tuple(self.clamped_blocks))
+
 
 def _tree_slice(x, sl):
     if eqx.is_array(x):
@@ -423,14 +426,17 @@ class SamplingSchedule:
     """
     Represents a sampling schedule for a process.
 
+    A schedule reaches `jax.jit` as a static argument, so it is hashed and compared
+    by value and is frozen: mutating one in place would change the hash of a live
+    compilation-cache key. Build a new schedule (or `dataclasses.replace`) instead.
+
     **Attributes:**
 
     - `n_warmup`: Nonnegative number of warmup steps before collecting samples.
     - `n_samples`: Positive number of records to collect.
     - `steps_per_sample`: Nonnegative number of steps between records.
 
-    Fields are static Python integers, checked once at construction; the
-    schedule is immutable. On JAX, record `r` follows
+    The ranges are checked once at construction. On JAX, record `r` follows
     `n_warmup + r * steps_per_sample` sweeps. Backends define how schedule steps
     relate to their execution; a step need not be a physical write or an
     observation window.

@@ -1,3 +1,4 @@
+import dataclasses
 import unittest
 
 import equinox as eqx
@@ -17,7 +18,8 @@ from thrml.block_sampling import (
 )
 from thrml.conditional_samplers import AbstractConditionalSampler, _SamplerState, _State
 from thrml.interaction import InteractionGroup
-from thrml.pgm import AbstractNode
+from thrml.models.ising import IsingEBM, IsingSamplingProgram
+from thrml.pgm import AbstractNode, SpinNode
 
 
 class ContinousScalarNode(AbstractNode):
@@ -239,3 +241,78 @@ class TestPyTreeState(unittest.TestCase):
 
         self.assertTrue(jnp.allclose(init_state[0].cat_counter + 1, res.cat_counter))
         self.assertTrue(jnp.allclose(init_state[0].float_counter + 1, res.float_counter))
+
+
+class TestSamplingSchedule(unittest.TestCase):
+    """A schedule is a static `jax.jit` argument, so it is a frozen value."""
+
+    def test_schedules_with_the_same_fields_are_interchangeable(self):
+        self.assertEqual(SamplingSchedule(3, 2, 1), SamplingSchedule(3, 2, 1))
+        self.assertEqual(hash(SamplingSchedule(3, 2, 1)), hash(SamplingSchedule(3, 2, 1)))
+        self.assertNotEqual(SamplingSchedule(3, 2, 1), SamplingSchedule(3, 2, 4))
+
+    def test_a_schedule_cannot_be_mutated(self):
+        schedule = SamplingSchedule(3, 2, 1)
+        with self.assertRaises(dataclasses.FrozenInstanceError):
+            setattr(schedule, "n_warmup", 4)
+
+    def test_a_schedule_stays_findable_in_a_dict(self):
+        cache = {SamplingSchedule(3, 2, 1): "hit"}
+        self.assertEqual(cache[SamplingSchedule(3, 2, 1)], "hit")
+
+
+class TestStaticArgumentsDoNotForceRecompiles(unittest.TestCase):
+    """Rebuilding an identical program must reuse the compiled sampling step.
+
+    Everything a program is built from — blocks, specs, schedules — reaches
+    `jax.jit` as a static argument, so they have to compare by value; if any of
+    them compared by identity, a caller that rebuilds its program each step (which
+    an `IsingEBM` caller must, since the model is immutable) would silently
+    recompile every step.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.node_a = SpinNode()
+        self.node_b = SpinNode()
+
+    def _program(self):
+        block_a, block_b = Block([self.node_a]), Block([self.node_b])
+        ebm = IsingEBM(
+            [self.node_a, self.node_b],
+            [(self.node_a, self.node_b)],
+            jnp.zeros(2),
+            jnp.ones(1),
+            jnp.array(1.0),
+        )
+        return IsingSamplingProgram(ebm, [block_a, block_b], []), [block_a, block_b]
+
+    def test_rebuilt_blocks_do_not_recompile(self):
+        n_traces = 0
+
+        @eqx.filter_jit
+        def count(x, blocks):
+            nonlocal n_traces
+            n_traces += 1
+            return x * len(blocks)
+
+        for _ in range(3):
+            count(jnp.ones(2), [Block([self.node_a]), Block([self.node_b])])
+
+        self.assertEqual(n_traces, 1)
+
+    def test_a_rebuilt_sampling_program_does_not_recompile(self):
+        n_traces = 0
+
+        @eqx.filter_jit
+        def run(program, sched, init_state, readout):
+            nonlocal n_traces
+            n_traces += 1
+            return sample_states(jax.random.key(0), program, sched, init_state, [], readout)
+
+        for _ in range(3):
+            program, blocks = self._program()
+            init_state = [jnp.zeros((1,), dtype=jnp.bool_) for _ in blocks]
+            run(program, SamplingSchedule(2, 2, 1), init_state, blocks)
+
+        self.assertEqual(n_traces, 1)
