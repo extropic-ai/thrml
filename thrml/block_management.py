@@ -51,8 +51,10 @@ class Block(Generic[_Node]):
         self.nodes = nodes_tuple
 
     def __setattr__(self, name: str, value) -> None:
-        if hasattr(self, "nodes"):
-            raise AttributeError("A Block is immutable; construct a new Block instead.")
+        # Only the state `__eq__`/`__hash__` read is frozen; a subclass is still free to
+        # set attributes of its own after `super().__init__()`.
+        if name in ("nodes", "_hash") and hasattr(self, name):
+            raise AttributeError(f"A Block is immutable: {name!r} cannot be reassigned; build a new Block instead.")
         object.__setattr__(self, name, value)
 
     def __eq__(self, other: object) -> bool:
@@ -194,7 +196,9 @@ class BlockSpec:
         self.node_shape_struct = dict(node_shape_dtypes)
         self.node_shape_dtypes = {i: _hash_pytree(j) for i, j in node_shape_dtypes.items()}
 
-        self.blocks = blocks
+        # Copied, not aliased: `blocks` is part of this spec's hash, so a caller who
+        # kept the list and appended to it would change the hash of a live cache key.
+        self.blocks = list(blocks)
 
         # come up with an ordering of SDs for the global representation of the blocks
         all_sds = list({sd for sd in self.node_shape_dtypes.values()})
