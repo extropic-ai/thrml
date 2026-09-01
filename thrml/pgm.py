@@ -31,6 +31,10 @@ class _UniqueID(metaclass=_CounterMeta):
     """
     This is a way of ensuring that there is a unique identifier
     for subclasses, without them being required to call super().__init__().
+
+    The identifier is a process-global counter, so it is unique only among the
+    instances a single process created, and only for as long as that process
+    lives. See the warning on [`thrml.AbstractNode`][].
     """
 
     __slots__ = ("_hash",)
@@ -62,6 +66,16 @@ class AbstractNode(_UniqueID):
 
     Every node used in a PGM must inherit from this class. When compiling a program, each node is assigned a
     shape and datatype that are used to organize the state of the sampling program in a jax-friendly way.
+
+    **Node identity is process-local.** A node's identity — what `==`, `hash` and `<` use, and therefore what
+    every [`thrml.Block`][], [`thrml.BlockSpec`][] and node-keyed dict looks a node up by — is a counter handed
+    out in creation order within one process. It is not derived from anything about the node itself, so nodes
+    are only comparable against other nodes the same process created.
+
+    In particular, a node that is serialized (with `pickle`, say) keeps its counter value, and reloading it in
+    another process will make it compare equal to whichever unrelated node that process happened to create at
+    the same point in its own creation order. Reload a graph in one piece — the nodes together with the blocks
+    and edges that refer to them — and do not mix reloaded nodes with freshly built ones.
     """
 
     def __new__(cls, *args, **kwargs):

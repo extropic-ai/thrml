@@ -101,6 +101,9 @@ class BlockGibbsSpec(BlockSpec):
         self.sampling_order = sampling_order
         self.superblocks = superblocks
 
+    def _value_key(self) -> tuple:
+        return (super()._value_key(), tuple(self.superblocks), tuple(self.clamped_blocks))
+
 
 def _tree_slice(x, sl):
     if eqx.is_array(x):
@@ -399,10 +402,14 @@ def _run_blocks(
     return jax.lax.scan(body_fn, (init_chain_state, sampler_states), keys)[0]
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class SamplingSchedule:
     """
     Represents a sampling schedule for a process.
+
+    A schedule reaches `jax.jit` as a static argument, so it is hashed and compared
+    by value and is frozen: mutating one in place would change the hash of a live
+    compilation-cache key. Build a new schedule (or `dataclasses.replace`) instead.
 
     **Attributes:**
 
@@ -414,9 +421,6 @@ class SamplingSchedule:
     n_warmup: int
     n_samples: int
     steps_per_sample: int
-
-    def __hash__(self) -> int:
-        return hash((self.n_warmup, self.n_samples, self.steps_per_sample))
 
 
 def sample_with_observation(

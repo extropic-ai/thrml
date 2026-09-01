@@ -25,6 +25,13 @@ class Block(Generic[_Node]):
     Each block represents a collection of nodes that can efficiently be sampled
     simultaneously in a JAX-friendly SIMD manner. In THRML, this means that the nodes must all be of the same type.
 
+    A block is an immutable value: two blocks holding the same nodes in the same
+    order compare equal and hash equally, whether or not they are the same object.
+    That matters because blocks reach `jax.jit` as static arguments (directly, or
+    inside a `BlockSpec` or a `BlockSamplingProgram`), so identity semantics would
+    silently recompile every time a caller rebuilt an otherwise identical block.
+    `nodes` cannot be reassigned after construction; build a new block instead.
+
     **Attributes:**
 
     - `nodes`: the tuple of nodes that this block contains
@@ -38,7 +45,23 @@ class Block(Generic[_Node]):
             first_type = type(nodes_tuple[0])
             if {type(node) for node in nodes_tuple} != {first_type}:
                 raise ValueError("All nodes in a block must be of the same type")
+        # Cached so that hashing a block stays O(1): a block may be hashed on
+        # every `jax.jit` dispatch, and it may hold hundreds of thousands of nodes.
+        self._hash = hash(nodes_tuple)
         self.nodes = nodes_tuple
+
+    def __setattr__(self, name: str, value) -> None:
+        if hasattr(self, "nodes"):
+            raise AttributeError("A Block is immutable; construct a new Block instead.")
+        object.__setattr__(self, name, value)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Block):
+            return False
+        return self.nodes == other.nodes
+
+    def __hash__(self) -> int:
+        return self._hash
 
     @property
     def node_type(self) -> Type[_Node]:
@@ -76,6 +99,11 @@ def _hash_pytree(x: PyTree[jax.ShapeDtypeStruct]) -> _PyTreeStruct:
     return (jax.tree.structure(x), tuple(jax.tree.leaves(x)))
 
 
+def _type_order(item: tuple[Type[AbstractNode], _PyTreeStruct]) -> tuple[str, str]:
+    """A stable, import-independent ordering for node types."""
+    return (item[0].__module__, item[0].__qualname__)
+
+
 class BlockSpec:
     """
     This contains the necessary mappings for logging indices of states and node types.
@@ -103,6 +131,11 @@ class BlockSpec:
     each. This (programmatically) is fine, but results in additional for loops that
     slow down JAX, compared to gathering indexes from a single array.
 
+    A `BlockSpec` is everywhere a static argument to `jax.jit` — on its own, or as
+    part of a `BlockSamplingProgram` — so it compares and hashes by value: two specs
+    built from equal blocks and equal node shape/dtypes are interchangeable, and
+    rebuilding one does not force a recompile. It must therefore not be mutated
+    after construction.
 
     **Attributes:**
 
@@ -196,6 +229,26 @@ class BlockSpec:
                 node_global_location_map[node] = (sd_ind, start_ind + k)
         self.block_to_global_slice_spec = block_to_global_slice_spec
         self.node_global_location_map = node_global_location_map
+
+    def _value_key(self) -> tuple:
+        """The constructor arguments this spec is derived from, as a hashable tuple.
+
+        Everything else a `BlockSpec` holds is computed from these, so two specs
+        with equal keys are interchangeable. Subclasses that take further
+        constructor arguments extend this.
+        """
+        node_sds = tuple(
+            (t.__module__, t.__qualname__, sd) for t, sd in sorted(self.node_shape_dtypes.items(), key=_type_order)
+        )
+        return (tuple(self.blocks), node_sds)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, BlockSpec) or type(other) is not type(self):
+            return False
+        return self._value_key() == other._value_key()
+
+    def __hash__(self) -> int:
+        return hash((type(self), self._value_key()))
 
 
 def _stack(*args):

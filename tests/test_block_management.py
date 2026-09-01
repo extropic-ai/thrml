@@ -6,7 +6,7 @@ import jax.numpy as jnp
 from jaxtyping import Array
 
 import thrml.pgm
-from thrml import block_management
+from thrml import block_management, block_sampling
 
 
 class Node1(thrml.pgm.AbstractNode):
@@ -246,3 +246,91 @@ class TestDuplicate(unittest.TestCase):
             _ = block_management.BlockSpec(self.good_blocks + self.good_blocks, self.node_sd)
 
         self.assertIn("show up twice", str(error.exception))
+
+
+class TestBlockValueSemantics(unittest.TestCase):
+    """Blocks are values: they compare and hash by their nodes, not by identity."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.nodes = [Node1() for _ in range(3)]
+
+    def test_blocks_over_the_same_nodes_are_equal(self):
+        a, b = self.nodes[:2]
+        self.assertEqual(block_management.Block([a, b]), block_management.Block([a, b]))
+        self.assertEqual(hash(block_management.Block([a, b])), hash(block_management.Block([a, b])))
+
+    def test_order_and_membership_matter(self):
+        a, b, c = self.nodes
+        self.assertNotEqual(block_management.Block([a, b]), block_management.Block([b, a]))
+        self.assertNotEqual(block_management.Block([a, b]), block_management.Block([a, c]))
+        self.assertNotEqual(block_management.Block([a, b]), block_management.Block([a]))
+
+    def test_a_rebuilt_block_finds_its_entry_in_a_dict(self):
+        a, b = self.nodes[:2]
+        cache = {block_management.Block([a, b]): "hit"}
+        self.assertEqual(cache[block_management.Block([a, b])], "hit")
+
+    def test_a_block_is_not_equal_to_its_node_tuple(self):
+        a, b = self.nodes[:2]
+        self.assertNotEqual(block_management.Block([a, b]), (a, b))
+
+    def test_a_block_is_immutable(self):
+        block = block_management.Block(self.nodes)
+        with self.assertRaises(AttributeError) as error:
+            block.nodes = ()
+        self.assertIn("immutable", str(error.exception))
+
+
+class TestBlockSpecValueSemantics(unittest.TestCase):
+    """A `BlockSpec` is derived entirely from its blocks and node shape/dtypes, and
+    compares by them, so rebuilding one does not make a fresh `jax.jit` cache key.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.block_1 = block_management.Block([Node1() for _ in range(3)])
+        self.block_2 = block_management.Block([Node2() for _ in range(2)])
+        self.node_sd = {
+            Node1: jax.ShapeDtypeStruct((), dtype=jnp.bool_),
+            Node2: jax.ShapeDtypeStruct((2,), dtype=jnp.float32),
+        }
+
+    def _spec(self, blocks, node_sd=None):
+        return block_management.BlockSpec(blocks, self.node_sd if node_sd is None else node_sd)
+
+    def test_rebuilding_a_spec_gives_an_equal_spec(self):
+        blocks = [self.block_1, self.block_2]
+        self.assertEqual(self._spec(blocks), self._spec(list(blocks)))
+        self.assertEqual(hash(self._spec(blocks)), hash(self._spec(list(blocks))))
+
+    def test_different_blocks_give_different_specs(self):
+        self.assertNotEqual(self._spec([self.block_1]), self._spec([self.block_2]))
+        self.assertNotEqual(
+            self._spec([self.block_1, self.block_2]),
+            self._spec([self.block_2, self.block_1]),
+        )
+
+    def test_different_shape_dtypes_give_different_specs(self):
+        other_sd = dict(self.node_sd)
+        other_sd[Node1] = jax.ShapeDtypeStruct((), dtype=jnp.uint8)
+        self.assertNotEqual(self._spec([self.block_1]), self._spec([self.block_1], other_sd))
+
+    def test_the_free_clamped_split_is_part_of_the_identity(self):
+        free_and_clamped = block_sampling.BlockGibbsSpec([self.block_1], [self.block_2], self.node_sd)
+        both_free = block_sampling.BlockGibbsSpec([self.block_1, self.block_2], [], self.node_sd)
+        # The two hold the same blocks in the same order, but sample differently.
+        self.assertEqual(free_and_clamped.blocks, both_free.blocks)
+        self.assertNotEqual(free_and_clamped, both_free)
+
+    def test_the_superblock_grouping_is_part_of_the_identity(self):
+        grouped = block_sampling.BlockGibbsSpec([(self.block_1, self.block_2)], [], self.node_sd)
+        separate = block_sampling.BlockGibbsSpec([self.block_1, self.block_2], [], self.node_sd)
+        self.assertEqual(grouped.free_blocks, separate.free_blocks)
+        self.assertNotEqual(grouped, separate)
+
+    def test_a_gibbs_spec_is_never_equal_to_a_plain_spec(self):
+        gibbs = block_sampling.BlockGibbsSpec([self.block_1], [], self.node_sd)
+        plain = self._spec([self.block_1])
+        self.assertNotEqual(gibbs, plain)
+        self.assertNotEqual(plain, gibbs)
