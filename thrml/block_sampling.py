@@ -97,7 +97,8 @@ class BlockGibbsSpec(BlockSpec):
 
         super().__init__(free_blocks + clamped_blocks, node_shape_dtypes)
         self.free_blocks = free_blocks
-        self.clamped_blocks = clamped_blocks
+        # Copied for the same reason as `BlockSpec.blocks`: it is part of the hash.
+        self.clamped_blocks = list(clamped_blocks)
         self.sampling_order = sampling_order
         self.superblocks = superblocks
 

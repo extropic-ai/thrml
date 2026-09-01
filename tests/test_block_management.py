@@ -1,3 +1,4 @@
+import pickle
 import unittest
 
 import equinox as eqx
@@ -257,8 +258,11 @@ class TestBlockValueSemantics(unittest.TestCase):
 
     def test_blocks_over_the_same_nodes_are_equal(self):
         a, b = self.nodes[:2]
-        self.assertEqual(block_management.Block([a, b]), block_management.Block([a, b]))
-        self.assertEqual(hash(block_management.Block([a, b])), hash(block_management.Block([a, b])))
+        # Both blocks are held alive: two temporaries can land at the same address and
+        # so hash alike under identity semantics, which would not test anything.
+        first, second = block_management.Block([a, b]), block_management.Block([a, b])
+        self.assertEqual(first, second)
+        self.assertEqual(hash(first), hash(second))
 
     def test_order_and_membership_matter(self):
         a, b, c = self.nodes
@@ -280,6 +284,23 @@ class TestBlockValueSemantics(unittest.TestCase):
         with self.assertRaises(AttributeError) as error:
             block.nodes = ()
         self.assertIn("immutable", str(error.exception))
+
+    def test_only_the_hashed_state_is_frozen(self):
+        """A subclass must still be able to set its own attributes."""
+
+        class TaggedBlock(block_management.Block):
+            def __init__(self, nodes, tag):
+                super().__init__(nodes)
+                self.tag = tag
+
+        self.assertEqual(TaggedBlock(self.nodes, "t").tag, "t")
+
+    def test_a_block_survives_a_pickle_round_trip(self):
+        block = block_management.Block(self.nodes)
+        restored = pickle.loads(pickle.dumps(block))
+        # The nodes are the same objects, so the reloaded block is still the same value.
+        self.assertEqual(restored, block)
+        self.assertEqual(hash(restored), hash(block))
 
 
 class TestBlockSpecValueSemantics(unittest.TestCase):
@@ -334,3 +355,17 @@ class TestBlockSpecValueSemantics(unittest.TestCase):
         plain = self._spec([self.block_1])
         self.assertNotEqual(gibbs, plain)
         self.assertNotEqual(plain, gibbs)
+
+    def test_the_caller_s_lists_cannot_change_a_spec_s_hash(self):
+        """The block lists are copied, so a spec already used as a cache key stays put."""
+        blocks = [self.block_1]
+        spec = self._spec(blocks)
+        clamped = [self.block_2]
+        gibbs = block_sampling.BlockGibbsSpec(blocks, clamped, self.node_sd)
+        before, gibbs_before = hash(spec), hash(gibbs)
+
+        blocks.append(self.block_2)
+        clamped.clear()
+
+        self.assertEqual(hash(spec), before)
+        self.assertEqual(hash(gibbs), gibbs_before)
