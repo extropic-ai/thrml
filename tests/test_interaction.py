@@ -1,6 +1,7 @@
 import unittest
 
 import jax.numpy as jnp
+import numpy as np
 
 from thrml.block_management import Block
 from thrml.interaction import InteractionGroup
@@ -41,3 +42,24 @@ class TestInteractionInputs(unittest.TestCase):
         with self.assertRaises(RuntimeError) as error:
             _ = InteractionGroup(bad_interaction, self.good_head, self.good_tails)
         self.assertIn("leading dimension", str(error.exception))
+
+    def test_good_numpy_interaction(self):
+        _ = InteractionGroup(np.zeros((len(self.good_head),)), self.good_head, self.good_tails)
+
+    def test_bad_numpy_interaction(self):
+        # NumPy leaves are arrays as far as the sampler is concerned: it gathers them along axis 0
+        # with `jnp.take`, which fills out-of-range reads instead of failing. So they have to be
+        # validated exactly like JAX arrays are.
+        for bad_leaf in (
+            np.zeros((len(self.good_head) - 1,)),
+            np.zeros((len(self.good_head) + 1,)),
+            np.array(1.0),
+            np.float32(1.0),
+        ):
+            with self.subTest(leaf=bad_leaf):
+                with self.assertRaises(RuntimeError) as error:
+                    _ = InteractionGroup((self.good_interaction, bad_leaf), self.good_head, self.good_tails)
+                self.assertIn("leading dimension", str(error.exception))
+
+    def test_non_array_leaves_are_skipped(self):
+        _ = InteractionGroup((self.good_interaction, 1.0, 7, None), self.good_head, self.good_tails)
