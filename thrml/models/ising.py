@@ -251,7 +251,8 @@ def estimate_kl_grad(
         conditioning_values: values to assign to the nodes that the model is conditioned on.
          Each array has shape [nodes]
         init_state_positive: initial state for the positive sampling chain. Each array has
-         shape [n_chains_pos batch nodes]
+         shape [n_chains_pos batch nodes]. Pass [] only when the positive program has no free blocks;
+         in that case the positive moments are read directly from all data and conditioning blocks.
         init_state_negative: initial state for the negative sampling chain. Each array has
          shape [n_chains_neg nodes]
     Returns:
@@ -264,18 +265,22 @@ def estimate_kl_grad(
     cond_batched_pos = jax.tree.map(lambda x: jnp.broadcast_to(x, (data[0].shape[0], *x.shape)), conditioning_values)
 
     if len(init_state_positive) == 0:
-        # if there are no initial states in pos sampling
-        # data[0]: (batch, n_nodes)
-        spins = 2 * data[0].astype(float_type) - 1  # (batch, n_nodes)
-
-        ei_idx = jnp.array([bias_nodes.index(e[0]) for e in weight_edges])  # (n_edges,)
-        ej_idx = jnp.array([bias_nodes.index(e[1]) for e in weight_edges])  # (n_edges,)
-
-        moms_b_pos = spins  # (batch, n_nodes)
-        moms_w_pos = spins[:, ei_idx] * spins[:, ej_idx]  # (batch, n_edges)
-
-        moms_b_pos = moms_b_pos[None]  # (1, batch, n_nodes)
-        moms_w_pos = moms_w_pos[None]  # (1, batch, n_edges)
+        if training_spec.program_positive.gibbs_spec.free_blocks:
+            raise ValueError("init_state_positive is required when the positive program has free blocks.")
+        # Observe the fully clamped state without Gibbs updates.
+        moms_b_pos, moms_w_pos = jax.vmap(
+            lambda c: estimate_moments(
+                key_pos,
+                bias_nodes,
+                weight_edges,
+                training_spec.program_positive,
+                SamplingSchedule(0, 1, 1),
+                [],
+                c,
+            )
+        )(data + cond_batched_pos)
+        moms_b_pos = moms_b_pos[None]
+        moms_w_pos = moms_w_pos[None]
     else:
         keys_pos = jax.random.split(key_pos, init_state_positive[0].shape[:2])
         moms_b_pos, moms_w_pos = jax.vmap(
