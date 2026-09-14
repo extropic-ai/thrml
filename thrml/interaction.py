@@ -1,6 +1,5 @@
 import equinox as eqx
 import jax
-import jax.numpy as jnp
 from jaxtyping import PyTree
 
 from thrml.block_management import Block
@@ -52,8 +51,10 @@ class InteractionGroup(eqx.Module):
             if not len(block.nodes) == interaction_size:
                 raise RuntimeError("All tail node blocks must have the same length as head_nodes")
 
+        # `eqx.is_array` is the predicate `_tree_slice` uses to decide which leaves get gathered
+        # along axis 0 during sampling, so validation has to use it too or the two disagree.
         def _get_dim(x):
-            return (-1 if not len(x.shape) else x.shape[0]) if isinstance(x, jnp.ndarray) else interaction_size
+            return (-1 if not len(x.shape) else x.shape[0]) if eqx.is_array(x) else interaction_size
 
         dims = jax.tree.leaves(jax.tree.map(_get_dim, interaction))
         if not all(dim == interaction_size for dim in dims):
