@@ -29,5 +29,6 @@ from .observers import StateObserver as StateObserver
 from .pgm import AbstractNode as AbstractNode
 from .pgm import CategoricalNode as CategoricalNode
 from .pgm import SpinNode as SpinNode
+from .tempering import parallel_tempering as parallel_tempering
 
 __version__ = importlib.metadata.version("thrml")
