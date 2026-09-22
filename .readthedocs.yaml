@@ -7,10 +7,10 @@ build:
   commands:
     # Editable install so render_html.py can introspect the live thrml package.
     - pip install -e .[docs]
-    # Licensed fonts/videos from the private assets repo. DOCS_ASSETS_TOKEN is a
-    # read-only token set in the RTD project env; if it's missing the build still
-    # succeeds (pages fall back to system fonts).
-    - git clone --depth 1 "https://x-access-token:${DOCS_ASSETS_TOKEN}@github.com/extropic-ai/docs-assets.git" docs_site/_assets || echo "docs-assets unavailable; building without licensed fonts/videos"
+    # Production must not publish a successful build with missing fonts/videos.
+    # DOCS_ASSETS_TOKEN is a read-only token set in the RTD project environment.
+    - test -n "$DOCS_ASSETS_TOKEN"
+    - git clone --depth 1 "https://x-access-token:${DOCS_ASSETS_TOKEN}@github.com/extropic-ai/docs-assets.git" docs_site/_assets
     - python docs_site/scripts/render_html.py
     - mkdir -p "$READTHEDOCS_OUTPUT/html"
     - cp -r docs_site/rendered/. "$READTHEDOCS_OUTPUT/html/"

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 191.2 24.7" fill="#fff1c8" role="img" aria-label="THRML">
+  <title>THRML</title>
+  <!-- T and R reuse Torx's Extropic logotype paths. H, M and L follow the same
+       3.6-unit strokes, chamfered terminals and 24.7-unit cap height. -->
+  <g transform="translate(-79)"><path d="M107.4,2.5l-2,1.8h-10.4v18.3l-1.8,2-1.8-2V4.3h-10.4l-2-1.8,2-1.8h24.3l2,1.8Z"/></g>
+  <g transform="translate(38)"><path d="M0 2.1 1.8 0 3.6 2.1V10.5H24.4V2.1L26.2 0 28 2.1V22.6L26.2 24.7 24.4 22.6V14.1H3.6V22.6L1.8 24.7 0 22.6Z"/></g>
+  <g transform="translate(-38.4)"><path d="M143.6,2.5v11s-2,1.8-2,1.8h-5.5l2.9,5.1h2.6l2,1.8-2,1.8h-4.7l-5-8.6h-11.2l-2,1.8v5.5l-1.8,2.1-1.8-2.1v-9.1l2-1.8h20.9l2-1.8v-3.8l-2-1.8h-21s-2-1.8-2-1.8l2-1.8h24.6s2,1.8,2,1.8Z"/></g>
+  <g transform="translate(115)"><path d="M0 22.6V2.5L2 .7H5.2L17 15.3 28.8 .7H32L34 2.5V22.6L32.2 24.7 30.4 22.6V4.8L18.8 19.2H15.2L3.6 4.8V22.6L1.8 24.7Z"/></g>
+  <g transform="translate(159)"><path d="M0 2.1 1.8 0 3.6 2.1V18.6L5.6 20.4H30.2L32.2 22.2 30.2 24H2L0 22.2Z"/></g>
+</svg>
