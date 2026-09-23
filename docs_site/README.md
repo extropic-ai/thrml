@@ -31,10 +31,11 @@ output and is gitignored.
 - The brand fonts and hero/footer videos are licensed. For a complete local
   preview, run `gh repo clone extropic-ai/docs-assets docs_site/_assets` before
   building. Local builds without that private checkout use system fonts.
-- Read the Docs requires `DOCS_ASSETS_TOKEN` with read access to
-  `extropic-ai/docs-assets`. A missing or invalid credential fails the hosted
-  build instead of publishing missing fonts/videos. Assets are copied into the
-  output and served from the docs host, with no external CDN.
+- Published Read the Docs builds require `DOCS_ASSETS_TOKEN` with read access to
+  `extropic-ai/docs-assets`. Missing credentials or assets fail publication.
+  PR previews (`READTHEDOCS_VERSION_TYPE=external`) without the secret use
+  fallback assets, matching Torx. Assets are served from the docs host, with
+  no external CDN.
 
 ## Adding a public API symbol
 
