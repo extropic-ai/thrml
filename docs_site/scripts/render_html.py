@@ -78,6 +78,7 @@ def copy_static():
         (NB_DIR / "codon_pipeline.png", FIG_DIR / "codon_pipeline.png"),
         (BRAND_DIR / "flow.png", FIG_DIR / "flow.png"),
         (BRAND_DIR / "extropic_wordmark.png", FIG_DIR / "extropic_wordmark.png"),
+        (BRAND_DIR / "wordmark.svg", FIG_DIR / "wordmark.svg"),
     ]:
         if src.exists():
             shutil.copy2(src, dst)

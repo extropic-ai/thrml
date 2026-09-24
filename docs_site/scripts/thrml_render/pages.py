@@ -344,7 +344,7 @@ def write_index(entries):
     )
     body = f"""<body>
   <header class="nav">
-    <a class="brand" href="index.html">{LOGO_SVG}<span class="brand-name">THRML</span></a>
+    <a class="brand" href="index.html">{LOGO_SVG}<img class="thrml-wordmark" src="assets/wordmark.svg" alt="THRML" width="93" height="12"></a>
     <nav class="pills">
       <a class="pill" href="getting-started.html">Docs</a>
       <a class="pill" href="examples.html">Examples</a>
