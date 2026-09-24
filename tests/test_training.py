@@ -170,11 +170,22 @@ class TestContrastiveDivergenceLoss(unittest.TestCase):
         blocks = [Block(model.nodes)]
         valid_samples = [jnp.ones((1, 2), dtype=jnp.bool_)]
 
-        with self.assertRaisesRegex(ValueError, "at least one sample"):
-            contrastive_divergence_loss(model, [], valid_samples, blocks)
+        for positive, negative in (([], valid_samples), (valid_samples, [])):
+            with self.subTest(positive=bool(positive), negative=bool(negative)):
+                with self.assertRaisesRegex(ValueError, "at least one sample"):
+                    contrastive_divergence_loss(model, positive, negative, blocks)
 
         with self.assertRaisesRegex(ValueError, "at least one sample"):
             contrastive_divergence_loss(model, valid_samples, [jnp.empty((0, 2), dtype=jnp.bool_)], blocks)
 
+        with self.assertRaisesRegex(ValueError, "at least one sample"):
+            contrastive_divergence_loss(model, [jnp.array(1.0)], valid_samples, blocks)
+
         with self.assertRaisesRegex(ValueError, "one state per block"):
             contrastive_divergence_loss(model, valid_samples * 2, valid_samples, blocks)
+
+        split_blocks = [Block([nodes[1]]), Block([nodes[0]])]
+        mismatched_samples = [jnp.ones((2, 1), dtype=jnp.bool_), jnp.ones((1, 1), dtype=jnp.bool_)]
+        matching_negative_samples = [jnp.ones((1, 1), dtype=jnp.bool_) for _ in split_blocks]
+        with self.assertRaises(ValueError):
+            contrastive_divergence_loss(model, mismatched_samples, matching_negative_samples, split_blocks)
