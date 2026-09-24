@@ -51,6 +51,7 @@ INDEX_BLURBS = {
     "01": "The whole library end to end: nodes and blocks, factors and interaction groups, programs, and block Gibbs sampling.",
     "02": "Ising and spin energy-based models built from scratch, then scaled to measure block-Gibbs throughput on 8 B200s.",
     "03": "A real design problem end to end: optimize a gene's codons by writing the objective as an energy function, building it as a Potts model and an equivalent Ising model, and sampling with simulated annealing.",
+    "04": "Train a small categorical factor graph with Gibbs samples and an energy-difference gradient.",
 }
 
 INDEX_SECTIONS = [
@@ -60,6 +61,7 @@ INDEX_SECTIONS = [
         ["00", "01", "02"],
     ),
     ("Applications", "Real problems compiled to graphical models and sampled on thermodynamic hardware.", ["03"]),
+    ("Training", "Use sampled model states to estimate gradients for factorized energy-based models.", ["04"]),
 ]
 
 MATHJAX = (
@@ -166,7 +168,13 @@ API_CATEGORIES = [
         "module": "thrml.models",
         "group": "Models",
         "blurb": "Energy-based models define a distribution through an energy function. THRML factorizes that energy so block Gibbs can sample it.",
-        "symbols": ["AbstractEBM", "AbstractFactorizedEBM", "FactorizedEBM", "EBMFactor"],
+        "symbols": [
+            "AbstractEBM",
+            "AbstractFactorizedEBM",
+            "FactorizedEBM",
+            "EBMFactor",
+            "contrastive_divergence_loss",
+        ],
     },
     {
         "label": "Discrete energy-based models",
