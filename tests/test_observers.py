@@ -42,7 +42,7 @@ class TestMomentObserver(unittest.TestCase):
     def test_deduplicates_nodes_across_moments(self):
         nodes = [SpinNode() for _ in range(4)]
         first_moments = [(node,) for node in nodes]
-        second_moments = [(left, right) for left in nodes for right in nodes]
+        second_moments = [(nodes[i], nodes[j]) for i in range(len(nodes)) for j in range(i + 1, len(nodes))]
 
         observer = MomentAccumulatorObserver([first_moments, second_moments])
 
