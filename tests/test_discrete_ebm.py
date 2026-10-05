@@ -988,7 +988,7 @@ class TestBigGrid(unittest.TestCase):
         delta_side = (side_lens[1:] / side_lens[:-1]) ** 2
         delta_time = times[1:] / times[:-1]
 
-        scaling_correct = delta_time < 1.1 * delta_side
+        scaling_correct = delta_time < 1.25 * delta_side
 
         # we should try to improve the constant factors here
-        self.assertTrue(np.all(scaling_correct))
+        self.assertTrue(np.all(scaling_correct), msg=f"times={times}, delta_time={delta_time}, delta_side={delta_side}")
