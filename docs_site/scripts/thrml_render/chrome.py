@@ -24,7 +24,9 @@ def build_topbar():
         '<button class="thrml-burger" type="button" aria-label="Toggle navigation">'
         '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>'
         "</button>"
-        '<a class="thrml-brand" href="index.html">' + LOGO_SVG + '<span class="thrml-title">THRML</span></a>'
+        '<a class="thrml-brand" href="index.html">'
+        + LOGO_SVG
+        + '<img class="thrml-wordmark" src="assets/wordmark.svg" alt="THRML" width="93" height="12"></a>'
         "</div>"
         '<nav class="thrml-pills">'
         '<a class="thrml-pill" href="getting-started.html">Get started</a>'
