@@ -335,11 +335,10 @@ class SpinGibbsConditional(BernoulliConditional):
 
                 weights = _batch_gather(interaction.weights, *state_cat)
                 spin_prod = _spin_product(state_bin).astype(weights.dtype)
-                active = active.astype(weights.dtype)
                 if i == 0:
                     gamma = gamma.astype(weights.dtype)
 
-                gamma += jnp.sum(weights * active * spin_prod, axis=-1)
+                gamma += jnp.sum(jnp.where(active, weights * spin_prod, 0.0), axis=-1)
             else:
                 raise RuntimeError("Unsupported interaction found")
         return gamma, sampler_state
@@ -385,7 +384,7 @@ class CategoricalGibbsConditional(SoftmaxConditional):
                 if i == 0:
                     theta = theta.astype(weights.dtype)
 
-                theta += jnp.sum(spin_prod * weights * jnp.expand_dims(active, -1).astype(weights.dtype), axis=-2)
+                theta += jnp.sum(jnp.where(jnp.expand_dims(active, -1), spin_prod * weights, 0.0), axis=-2)
 
             else:
                 raise RuntimeError("Unsupported interaction found")
