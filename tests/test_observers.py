@@ -38,3 +38,15 @@ class TestMomentObserver(unittest.TestCase):
             carry_out, _ = observer(self.program, state_free, [], carry, jnp.array(0, dtype=jnp.int32))
 
         self.assertEqual(carry_out[0][0], 2)
+
+    def test_deduplicates_nodes_across_moments(self):
+        nodes = [SpinNode() for _ in range(4)]
+        first_moments = [(node,) for node in nodes]
+        second_moments = [(nodes[i], nodes[j]) for i in range(len(nodes)) for j in range(i + 1, len(nodes))]
+
+        observer = MomentAccumulatorObserver([first_moments, second_moments])
+
+        self.assertEqual(len(observer.blocks_to_sample), 1)
+        self.assertEqual(observer.blocks_to_sample[0].nodes, nodes)
+        self.assertEqual(len(observer.flat_nodes_list), len(nodes))
+        self.assertEqual(len(observer.flat_to_type_slices_list[0]), len(nodes))
