@@ -333,6 +333,7 @@ def sample_single_block(
         program.per_block_interactions[block],
         program.per_block_interaction_active[block],
         all_interaction_states,
+        state_free[block],
         sampler_state,
         sd_to_pass,
     )

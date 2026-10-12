@@ -26,6 +26,7 @@ class AbstractConditionalSampler(eqx.Module):
         interactions: list[PyTree],
         active_flags: list[Array],
         states: list[list[_State]],
+        self_state: _State,
         sampler_state: _SamplerState,
         output_sd: PyTree[jax.ShapeDtypeStruct],
     ) -> tuple[_State, _SamplerState]:
@@ -106,6 +107,7 @@ class AbstractParametricConditionalSampler(AbstractConditionalSampler):
         interactions: list[PyTree],
         active_flags: list[Array],
         states: list[list[_State]],
+        self_state: _State,
         sampler_state: _SamplerState,
         output_sd: PyTree[jax.ShapeDtypeStruct],
     ) -> tuple[_State, _SamplerState]:
