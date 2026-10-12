@@ -452,10 +452,16 @@ def sample_with_observation(
         leading axis has size `schedule.n_samples`.
     """
     # run warmup
-    sampler_states = jax.tree.map(
-        lambda x: x.init(),
+    # Initialize each sampler with its own key so that samplers carrying
+    # stochastic latent state (e.g. AR(1) memory) are seeded independently.
+    sampler_leaves, sampler_treedef = jax.tree.flatten(
         program.samplers,
         is_leaf=lambda a: isinstance(a, AbstractConditionalSampler),
+    )
+    init_keys = jax.random.split(key, len(sampler_leaves))
+    sampler_states = jax.tree.unflatten(
+        sampler_treedef,
+        [sampler.init(k) for sampler, k in zip(sampler_leaves, init_keys)],
     )
     key, subkey = jax.random.split(key, 2)
     warmup_state, warmup_sampler_states = _run_blocks(

@@ -59,11 +59,15 @@ class AbstractConditionalSampler(eqx.Module):
         """
         pass
 
-    def init(self) -> None:
+    def init(self, key) -> None | tuple:
         """Initialize the sampler state before sampling begins.
 
         This is called before the first iteration of block sampling, after which the return of this method is
         superseded by the return from `sample`.
+
+        **Arguments:**
+
+        - `key`: A RNG key.
 
         Returns:
             the initial sampler state to use for the first iteration of block sampling.
