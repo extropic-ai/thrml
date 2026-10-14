@@ -397,7 +397,7 @@ def sample_single_block(
         updated during sampling.
     - `clamp_state`: Clamped states that remain fixed during the sampling process.
     - `program`: The Gibbs sampling program containing specifications, samplers,
-        neighborhood information, and program configurations.
+        neighborhood information, and parameters.
     - `block`: Index of the block to be sampled in the current iteration.
     - `sampler_state`: The current state of the sampler that will be used to
         perform the update.
@@ -524,7 +524,7 @@ class SamplingSchedule:
 
     - `n_warmup`: The number of warmup steps to run before collecting samples.
     - `n_samples`: The number of samples to collect.
-    - `steps_per_sample`: The number of steps between each sample.
+    - `steps_per_sample`: The number of steps to run between each sample.
     """
 
     n_warmup: int
