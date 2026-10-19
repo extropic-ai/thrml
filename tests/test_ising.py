@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import Mock
 
 import equinox as eqx
 import jax
@@ -266,3 +267,39 @@ class TestEstimateKLGradFullyVisible(unittest.TestCase):
         # Positive-phase bias moments should be exactly the data spins (no sampling occurs)
         expected_spins = 2 * data.astype(moms_b_pos.dtype) - 1
         self.assertTrue(jnp.allclose(moms_b_pos[0], expected_spins))
+
+
+class TestMomentValidation(unittest.TestCase):
+    def setUp(self):
+        self.nodes = [SpinNode(), SpinNode()]
+        self.edges = [(self.nodes[0], self.nodes[1])]
+        model = IsingEBM(self.nodes, self.edges, jnp.array([0.2, -0.3]), jnp.array([0.4]), jnp.array(1.3))
+        self.program = IsingSamplingProgram(model, [], [Block(self.nodes)])
+        self.clamps = [jnp.array([True, False])]
+        self.schedule = SamplingSchedule(0, 3, 0)
+
+    def _assert_invalid_statistics(self, nodes, edges):
+        backend = Mock()
+        with self.assertRaisesRegex(ValueError, "statistic nodes"):
+            estimate_moments(
+                jax.random.key(0), nodes, edges, self.program, self.schedule, [], self.clamps, backend=backend
+            )
+        backend.run.assert_not_called()
+        backend.map_chains.assert_not_called()
+
+    def test_unknown_first_moment_node_fails_before_backend_execution(self):
+        self._assert_invalid_statistics([SpinNode()], self.edges)
+
+    def test_unknown_second_moment_endpoint_fails_before_backend_execution(self):
+        self._assert_invalid_statistics(self.nodes, [(self.nodes[0], SpinNode())])
+
+    def test_empty_first_moments_preserve_the_unit_statistic(self):
+        first, second = estimate_moments(
+            jax.random.key(0), [], self.edges, self.program, self.schedule, [], self.clamps
+        )
+        self.assertEqual(first.shape, (1,))
+        self.assertEqual(second.shape, (1,))
+        self.assertTrue(jnp.array_equal(first, jnp.array([1.0])))
+        self.assertTrue(jnp.array_equal(second, jnp.array([-1.0])))
+        self.assertTrue(jnp.issubdtype(first.dtype, jnp.floating))
+        self.assertTrue(jnp.issubdtype(second.dtype, jnp.floating))

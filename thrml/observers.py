@@ -1,6 +1,6 @@
 import abc
 from collections import defaultdict
-from typing import TYPE_CHECKING, Callable, Sequence, TypeVar
+from typing import TYPE_CHECKING, Callable, Protocol, Sequence, TypeVar
 
 import equinox as eqx
 import jax
@@ -11,26 +11,56 @@ from jaxtyping import Array, Int, PyTree
 from thrml.block_management import Block, block_state_to_global, from_global_state
 
 if TYPE_CHECKING:
-    from thrml.block_sampling import _State, BlockSamplingProgram
+    from thrml.block_sampling import _State, BlockGibbsSpec
 
 from thrml.pgm import AbstractNode
 
 ObserveCarry = TypeVar("ObserveCarry", bound=PyTree)
 
 
+class SamplingContext(Protocol):
+    """The block layout available to portable observers.
+
+    Both logical and executable programs expose this interface. JAX passes its
+    compiled `BlockSamplingProgram` to observers, so JAX-specific observers may
+    additionally inspect `.samplers` and `.per_block_*` fields.
+    """
+
+    @property
+    def gibbs_spec(self) -> "BlockGibbsSpec":
+        """Layout of every free and clamped block supplied to the observer."""
+        ...
+
+
 class AbstractObserver(eqx.Module):
     """
     Interface for objects that inspect the sampling program while it is running.
 
-    A concrete Observer is called once per block-sampling iteration and can maintain an
-    arbitrary "carry" state across calls (e.g. running averages, histogram
-    buffers, log-probs, etc.).
+    An observer is called once per requested record and can maintain an explicit
+    carry across calls, such as running sums or histogram buffers.
+
+    A portable observer is a pure JAX function of `program.gibbs_spec`, the
+    complete free and clamped states, its carry, and the logical record index.
+    Immutable configuration is allowed; Python side effects and hidden mutable
+    state are not. Any state transformations must also be pure.
+
+    A backend may evaluate records individually or use an equivalent ordered
+    fold over windows. Purity does not allow independent `vmap` calls when an
+    observer depends on carry. Windows share carry and request-global indices,
+    and each requested record is emitted exactly once. A new request restarts
+    indices at zero, even when the physical chain continues.
+
+    Emitted PyTrees must have a consistent structure, shape, and dtype across
+    records. The first observation may initialize carry with a new dtype or
+    structure; subsequent scanned carry must keep that structure, shape, and
+    dtype. Carry and emitted outputs need not have the same structure. JAX
+    observes the first record before its scan to preserve this initialization.
     """
 
     @abc.abstractmethod
     def __call__(
         self,
-        program: "BlockSamplingProgram",
+        program: SamplingContext,
         state_free: list[PyTree[Array]],
         state_clamped: list[PyTree[Array]],
         carry: ObserveCarry,
@@ -38,8 +68,10 @@ class AbstractObserver(eqx.Module):
     ) -> tuple[ObserveCarry, PyTree]:
         """Make an observation.
 
-        This function is called at the end of a block-sampling iteration and can record information about the
-        current state of the sampling program that might be useful for something later.
+        The supplied state includes every free and clamped program block in
+        layout order. Portable observers use only the layout and explicit inputs.
+        Observers that inspect compiled samplers or interactions remain supported
+        on JAX, but are outside the portable subset.
 
         **Arguments:**
 
@@ -48,12 +80,13 @@ class AbstractObserver(eqx.Module):
         - `state_clamped`: The state of the clamped nodes involved in the sampling program.
         - `carry`: The "memory" available to this observer. This function should modify this PyTree to record
             information about the sampling program.
-        - `iteration`: How many iterations of block sampling have happened before this function was called.
+        - `iteration`: The record index, from zero to `n_samples - 1` within the
+            request. This is not the number of sampling sweeps.
 
         **Returns:**
 
         A tuple, where the first element is the updated carry, and the second is a PyTree that will be
-        recorded by the sampler.
+        recorded by the sampler, or `None` when nothing should be recorded.
 
         """
         return NotImplemented
@@ -65,7 +98,7 @@ class AbstractObserver(eqx.Module):
 
 class StateObserver(AbstractObserver):
     """
-    Observer which logs the raw state of some set of nodes.
+    Portable observer which logs the raw state of some set of nodes.
 
     **Attributes:**
 
@@ -76,7 +109,7 @@ class StateObserver(AbstractObserver):
 
     def __call__(
         self,
-        program: "BlockSamplingProgram",
+        program: SamplingContext,
         state_free: list["_State"],
         state_clamped: list["_State"],
         carry: None,
@@ -94,7 +127,7 @@ def _f_identity(*x):
 
 class MomentAccumulatorObserver(AbstractObserver):
     r"""
-    Observer that accumulates and updates the provided moments.
+    Portable observer that accumulates and updates the provided moments.
 
     It doesn't log any samples, and will only accumulate moments. Note that this observer does not
     scale the accumulated values by the number of times it was called. It simply records a running sum of a product
@@ -102,7 +135,11 @@ class MomentAccumulatorObserver(AbstractObserver):
 
     $$\sum_i f(x_1^i) f(x_2^i) \dots f(x_N^i)$$
 
-
+    The transformation must be pure for portability. `init()` creates floating
+    zeros; the first observation casts carry to the product dtype. Backends must
+    observe that first record before scanning subsequent records, including
+    when records are partitioned into windows. Normalize the final sums once
+    by the total record count, rather than averaging per-window means.
 
     **Attributes:**
 
@@ -196,7 +233,7 @@ class MomentAccumulatorObserver(AbstractObserver):
 
     def __call__(
         self,
-        program: "BlockSamplingProgram",
+        program: SamplingContext,
         state_free: list[PyTree[Array]],
         state_clamped: list[PyTree[Array]],
         carry: list[Array],

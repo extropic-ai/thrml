@@ -38,3 +38,30 @@ class TestMomentObserver(unittest.TestCase):
             carry_out, _ = observer(self.program, state_free, [], carry, jnp.array(0, dtype=jnp.int32))
 
         self.assertEqual(carry_out[0][0], 2)
+
+
+def test_first_record_can_initialize_carry_structure():
+    """Both JAX and ordered windows initialize carry before scanning later records."""
+    import numpy as np
+
+    from thrml import BlockSamplingProgram, SamplingSchedule, sample_with_observation
+
+    from .test_backends import ReplayBackend, assert_tree_equal
+
+    node = SpinNode()
+    program = BlockSamplingProgram(BlockGibbsSpec([], [Block([node])]), [], [])
+    clamps = [jnp.array([True])]
+    records = ([], [jnp.ones((6, 1), dtype=jnp.bool_)])
+
+    def observe(program, state_free, state_clamped, carry, iteration):
+        if carry is None:
+            carry = {"sum": jnp.array(0, dtype=jnp.int32)}
+        total = carry["sum"] + state_clamped[0][0].astype(jnp.int32) + iteration
+        return {"sum": total}, (total, iteration)
+
+    args = (jax.random.key(4), program, SamplingSchedule(2, 6, 3), [], clamps, None, observe)
+    expected = sample_with_observation(*args)
+    np.testing.assert_array_equal(expected[0]["sum"], 21)
+    for partitions in ((1, 3, 2), (2, 1, 3)):
+        actual = sample_with_observation(*args, backend=ReplayBackend(records, partitions))
+        assert_tree_equal(actual, expected)

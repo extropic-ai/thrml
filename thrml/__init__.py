@@ -1,6 +1,8 @@
 import importlib.metadata
 
 from . import models as models
+from .backends import JaxBackend as JaxBackend
+from .backends import SamplingBackend as SamplingBackend
 from .block_management import Block as Block
 from .block_management import BlockSpec as BlockSpec
 from .block_management import block_state_to_global as block_state_to_global
@@ -25,6 +27,7 @@ from .factor import WeightedFactor as WeightedFactor
 from .interaction import InteractionGroup as InteractionGroup
 from .observers import AbstractObserver as AbstractObserver
 from .observers import MomentAccumulatorObserver as MomentAccumulatorObserver
+from .observers import SamplingContext as SamplingContext
 from .observers import StateObserver as StateObserver
 from .pgm import AbstractNode as AbstractNode
 from .pgm import CategoricalNode as CategoricalNode

@@ -79,6 +79,26 @@ schedule = SamplingSchedule(n_warmup=100, n_samples=1000, steps_per_sample=2)
 samples = sample_states(k_samp, program, schedule, init_state, [], [Block(nodes)])
 ```
 
+## Sampling backends
+
+Sampling uses `JaxBackend` by default. `IsingSamplingProgram` holds the logical model
+in `.model` and its block layout in `.gibbs_spec`. Pass `backend=your_backend` to
+`sample_states`, `sample_with_observation`, `estimate_moments`, or `estimate_kl_grad`
+to use a backend supplied by an external package. Physical execution and calibration
+belong to that package.
+
+An initial state of `None` requests continuation of the backend's retained chain;
+actual JAX sampling requires an explicit state. Use `[]` for an explicitly empty
+state when there are no free blocks. Explicit physical initialization is optional
+and backend-owned, and may require additional device operations.
+
+For low-level JAX updates or access to `.samplers` and `.per_block_*`, convert an
+Ising program with `JaxBackend().compile(program)`. This produces the existing
+executable representation; it does not invoke `jax.jit`. Existing
+`BlockSamplingProgram` and `FactorSamplingProgram` objects remain executable.
+See the [concepts guide](https://docs.thrml.ai/concepts.html) for portable observers,
+backend batching, and training.
+
 ## More Examples
 
 For a more extensive example, see the [dtm-replication](https://github.com/pschilliOrange/dtm-replication) repository which runs on THRML.
