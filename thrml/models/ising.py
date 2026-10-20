@@ -184,14 +184,16 @@ def hinton_init(
     return data
 
 
+def _spin_transform(state, _):
+    """Map Boolean states to spins in {-1, +1}. A module-level function, so that two moment observers with the same
+    nodes and edges compare equal and a backend can use one compiled fold for both."""
+    return [2 * x.astype(jnp.int8) - 1 for x in state]
+
+
 def _ising_moment_observer(first_moment_nodes, second_moment_edges):
     first_moments = ((),)
     if len(first_moment_nodes) > 0:
         first_moments = [(node,) for node in first_moment_nodes]
-
-    def _spin_transform(state, _):
-        return [2 * x.astype(jnp.int8) - 1 for x in state]
-
     return MomentAccumulatorObserver((first_moments, second_moment_edges), _spin_transform)
 
 

@@ -16,6 +16,11 @@ class SamplingBackend(Protocol):
     backends may run requests serially on the host. Physical initialization,
     calibration, device control, and execution reports belong to the external
     package, not to the logical program or sampling return values.
+
+    A backend can compile the observer fold once and use it again for each
+    request whose observer compares equal to the first. An observer that holds
+    a function made inside a call is not equal to the observer of the next
+    call, and the backend then compiles again for each request.
     """
 
     def run(

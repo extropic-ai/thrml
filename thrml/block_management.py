@@ -28,6 +28,10 @@ class Block(Generic[_Node]):
     **Attributes:**
 
     - `nodes`: the tuple of nodes that this block contains
+
+    Two blocks with the same nodes, in the same order, are equal and have the
+    same hash. A backend can then compile a program or an observer once and use
+    it again for an equal one.
     """
 
     nodes: tuple[_Node, ...]
@@ -59,6 +63,12 @@ class Block(Generic[_Node]):
 
     def __contains__(self, item) -> bool:
         return item in self.nodes
+
+    def __eq__(self, other) -> bool:
+        return type(other) is Block and self.nodes == other.nodes
+
+    def __hash__(self) -> int:
+        return hash(self.nodes)
 
     def __add__(self, other):
         if isinstance(other, Block):

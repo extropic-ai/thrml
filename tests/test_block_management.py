@@ -246,3 +246,13 @@ class TestDuplicate(unittest.TestCase):
             _ = block_management.BlockSpec(self.good_blocks + self.good_blocks, self.node_sd)
 
         self.assertIn("show up twice", str(error.exception))
+
+
+class TestEquality(unittest.TestCase):
+    def test_blocks_with_the_same_nodes_are_equal(self):
+        nodes = [Node1() for _ in range(3)]
+        same = block_management.Block(nodes), block_management.Block(list(nodes))
+        self.assertEqual(same[0], same[1])
+        self.assertEqual(hash(same[0]), hash(same[1]))
+        self.assertNotEqual(same[0], block_management.Block(nodes[::-1]))
+        self.assertNotEqual(same[0], block_management.Block(nodes[:2]))

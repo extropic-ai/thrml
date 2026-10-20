@@ -55,6 +55,10 @@ class AbstractObserver(eqx.Module):
     structure; subsequent scanned carry must keep that structure, shape, and
     dtype. Carry and emitted outputs need not have the same structure. JAX
     observes the first record before its scan to preserve this initialization.
+
+    Give an observer only module-level functions as its configuration. Two
+    observers with the same configuration then compare equal, and a backend
+    can use one compiled fold for both.
     """
 
     @abc.abstractmethod

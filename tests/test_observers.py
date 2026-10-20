@@ -1,6 +1,7 @@
 import types
 import unittest
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 
@@ -65,3 +66,15 @@ def test_first_record_can_initialize_carry_structure():
     for partitions in ((1, 3, 2), (2, 1, 3)):
         actual = sample_with_observation(*args, backend=ReplayBackend(records, partitions))
         assert_tree_equal(actual, expected)
+
+
+def test_moment_observers_with_the_same_statistics_are_equal():
+    # A backend compiles the observer fold once for equal observers, so two calls of estimate_moments with the same
+    # nodes and edges must give equal observers.
+    from thrml.models.ising import _ising_moment_observer
+
+    nodes = [SpinNode() for _ in range(3)]
+    edges = [(nodes[0], nodes[1]), (nodes[1], nodes[2])]
+    first, second = (_ising_moment_observer(nodes, edges) for _ in range(2))
+    assert eqx.tree_equal(first, second)
+    assert not eqx.tree_equal(first, _ising_moment_observer(nodes, edges[:1]))
