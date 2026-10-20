@@ -79,8 +79,7 @@ _SPECULATION_JSON = '{ "prerender": [{ "where": { "href_matches": "/*" }, "eager
 SPECULATION_RULES = '<script type="speculationrules">\n' + _SPECULATION_JSON + "\n</script>\n"
 SPECULATION_RULES_INLINE = '<script type="speculationrules">' + _SPECULATION_JSON + "</script>\n"
 
-# API reference, generated from the installed thrml package and grouped the way
-# the library's own mkdocs nav groups it. Each category names the module its
+# API reference, generated from the installed thrml package. Each category names the module its
 # symbols live on ("thrml" or "thrml.models") and the sidebar group it sits under.
 API_CATEGORIES = [
     {
@@ -153,12 +152,20 @@ API_CATEGORIES = [
         ],
     },
     {
+        "label": "Sampling backends",
+        "slug": "api-backends",
+        "module": "thrml",
+        "group": "Core",
+        "blurb": "Backends execute sampling requests and choose how to batch chains. JaxBackend preserves THRML's default block Gibbs execution; external packages can supply other implementations.",
+        "symbols": ["SamplingBackend", "JaxBackend"],
+    },
+    {
         "label": "Sampling observers",
         "slug": "api-observers",
         "module": "thrml",
         "group": "Core",
         "blurb": "Observers accumulate statistics over a chain as it runs, so you read off moments or stored states without materializing every sample.",
-        "symbols": ["AbstractObserver", "StateObserver", "MomentAccumulatorObserver"],
+        "symbols": ["SamplingContext", "AbstractObserver", "StateObserver", "MomentAccumulatorObserver"],
     },
     {
         "label": "Energy-based models",

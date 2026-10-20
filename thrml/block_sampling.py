@@ -1,6 +1,7 @@
 import dataclasses
 from collections import defaultdict
-from typing import Mapping, Sequence, Type, TypeAlias
+from numbers import Integral
+from typing import TYPE_CHECKING, Mapping, Sequence, Type, TypeAlias
 
 import equinox as eqx
 import jax
@@ -13,7 +14,11 @@ from thrml.interaction import InteractionGroup
 from thrml.pgm import DEFAULT_NODE_SHAPE_DTYPES, AbstractNode
 
 from .conditional_samplers import AbstractConditionalSampler, _SamplerState
-from .observers import AbstractObserver, ObserveCarry, StateObserver
+from .observers import AbstractObserver, ObserveCarry, SamplingContext, StateObserver
+
+if TYPE_CHECKING:
+    from .backends import SamplingBackend
+    from .models.ising import IsingSamplingProgram
 
 # A SuperBlock is a collection of blocks that will be sampled at the same "time"
 # specifically, they will be sampled separately, but without updating the state
@@ -97,9 +102,13 @@ class BlockGibbsSpec(BlockSpec):
 
         super().__init__(free_blocks + clamped_blocks, node_shape_dtypes)
         self.free_blocks = free_blocks
-        self.clamped_blocks = clamped_blocks
+        # Copied for the same reason as `BlockSpec.blocks`: it is part of the hash.
+        self.clamped_blocks = list(clamped_blocks)
         self.sampling_order = sampling_order
         self.superblocks = superblocks
+
+    def _value_key(self) -> tuple:
+        return (super()._value_key(), tuple(self.superblocks), tuple(self.clamped_blocks))
 
 
 def _tree_slice(x, sl):
@@ -109,7 +118,11 @@ def _tree_slice(x, sl):
 
 
 class BlockSamplingProgram(eqx.Module):
-    """A PGM block-sampling program.
+    """An executable JAX block-sampling program.
+
+    Logical Ising programs can be lowered to this representation with
+    `JaxBackend().compile(program)` before inspecting samplers and interactions
+    or calling the low-level block-update functions.
 
     This class encapsulates everything that is needed to run a PGM block sampling program in THRML.
     `per_block_interactions` and `per_block_interaction_active` are parallel to the free blocks in `gibbs_spec`, and
@@ -274,6 +287,9 @@ def sample_single_block(
     states and program configurations. It extracts neighboring states, processes
     required data, and applies a sampling function to generate output samples.
 
+    Requires an executable `BlockSamplingProgram`. Lower a logical Ising program
+    with `JaxBackend().compile(program)` before calling this function.
+
     **Arguments:**
 
     - `key`: Pseudo-random number generator key to ensure reproducibility of sampling.
@@ -292,6 +308,9 @@ def sample_single_block(
 
     - Updated block state and sampler state for the specified block.
     """
+    if not isinstance(program, BlockSamplingProgram):
+        raise TypeError("sample_single_block requires a compiled program. Use JaxBackend().compile(program).")
+
     # flatten the state and extract neighbor states
     if global_state is None:
         global_state = block_state_to_global(state_free + clamp_state, program.gibbs_spec)
@@ -343,6 +362,9 @@ def sample_blocks(
 ) -> tuple[list[_State], list[_SamplerState]]:
     """Perform one iteration of sampling, visiting every block.
 
+    Requires an executable `BlockSamplingProgram`. Lower a logical Ising program
+    with `JaxBackend().compile(program)` before calling this function.
+
     **Arguments:**
 
     - `key`: The JAX PRNG key.
@@ -355,8 +377,10 @@ def sample_blocks(
 
     - Updated free-block state list and sampler-state list.
     """
+    if not isinstance(program, BlockSamplingProgram):
+        raise TypeError("sample_blocks requires a compiled program. Use JaxBackend().compile(program).")
 
-    # gaurdrail state/block compatibility here as everything else calls this
+    # Guardrail state/block compatibility for direct low-level calls.
 
     sds = {node_type: jax.tree.unflatten(*sd) for node_type, sd in program.gibbs_spec.node_shape_dtypes.items()}
     verify_block_state(program.gibbs_spec.free_blocks, state_free, sds, -1)
@@ -399,27 +423,105 @@ def _run_blocks(
     return jax.lax.scan(body_fn, (init_chain_state, sampler_states), keys)[0]
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class SamplingSchedule:
     """
     Represents a sampling schedule for a process.
 
+    A schedule reaches `jax.jit` as a static argument, so it is hashed and compared
+    by value and is frozen: mutating one in place would change the hash of a live
+    compilation-cache key and can reuse a result with the old record count.
+    Build a new schedule (or `dataclasses.replace`) instead.
+
     **Attributes:**
 
-    - `n_warmup`: The number of warmup steps to run before collecting samples.
-    - `n_samples`: The number of samples to collect.
-    - `steps_per_sample`: The number of steps to run between each sample.
+    - `n_warmup`: Nonnegative number of warmup steps before collecting samples.
+    - `n_samples`: Positive number of records to collect.
+    - `steps_per_sample`: Nonnegative number of steps between records.
+
+    Fields must be integers, excluding booleans. Types and ranges are checked at
+    construction and before execution. On JAX, record `r` follows
+    `n_warmup + r * steps_per_sample` sweeps. Backends define how schedule steps
+    relate to their execution; a step need not be a physical write or an
+    observation window.
     """
 
     n_warmup: int
     n_samples: int
     steps_per_sample: int
 
-    def __hash__(self) -> int:
-        return hash((self.n_warmup, self.n_samples, self.steps_per_sample))
+    def __post_init__(self) -> None:
+        self.validate()
+
+    def validate(self) -> None:
+        """Require integer fields, nonnegative sweep counts, and at least one record."""
+        for name, minimum in (("n_warmup", 0), ("n_samples", 1), ("steps_per_sample", 0)):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, Integral):
+                raise TypeError(f"{name} must be an integer, excluding bool.")
+            if value < minimum:
+                raise ValueError(f"{name} must be >= {minimum}.")
+
+
+def _validate_sampling_state(
+    program: SamplingContext,
+    init_chain_state: list[_State] | None,
+    state_clamp: list[_State],
+) -> None:
+    spec = program.gibbs_spec
+    node_shape_dtypes = {node_type: jax.tree.unflatten(*sd) for node_type, sd in spec.node_shape_dtypes.items()}
+    verify_block_state(spec.clamped_blocks, state_clamp, node_shape_dtypes, block_axis=-1)
+    if init_chain_state is not None:
+        verify_block_state(spec.free_blocks, init_chain_state, node_shape_dtypes, block_axis=-1)
 
 
 def sample_with_observation(
+    key: Key[Array, ""],
+    program: "BlockSamplingProgram | IsingSamplingProgram",
+    schedule: SamplingSchedule,
+    init_chain_state: list[PyTree[Shaped[Array, "nodes ?*state"]]] | None,
+    state_clamp: list[_State],
+    observation_carry_init: ObserveCarry,
+    f_observe: AbstractObserver,
+    *,
+    backend: "SamplingBackend | None" = None,
+) -> tuple[ObserveCarry, PyTree]:
+    """Run a sampling request and observe each requested record in order.
+
+    **Arguments:**
+
+    - `key`: RNG key.
+    - `program`: A logical Ising program or an executable JAX program.
+    - `schedule`: Warm-up length, number of samples, number of steps between samples.
+    - `init_chain_state`: Initial free-block state, or `None` to continue a
+        backend-owned chain. JAX requires an explicit state; `[]` is an explicit
+        state for a program with no free blocks. Explicit physical initialization
+        is optional and backend-owned and may require additional device work.
+    - `state_clamp`: Clamped-block state.
+    - `observation_carry_init`: Initial carry handed to `f_observe`.
+    - `f_observe`: Observer instance.
+    - `backend`: Execution backend. `None` selects `JaxBackend`. External
+        backends receive the original program and execute on the host; do not
+        enclose their execution in JAX transformations.
+
+    **Returns:**
+
+    - Tuple `(final_observer_carry, samples)` where `samples` is a PyTree whose
+        leading axis has size `schedule.n_samples`, or `None` if the observer
+        emits no records. The backend's result is returned unchanged. Randomness
+        and chain continuation belong to the backend; random sequences need not
+        agree across different backends.
+    """
+    from .backends import _resolve_backend
+
+    schedule.validate()
+    _validate_sampling_state(program, init_chain_state, state_clamp)
+    return _resolve_backend(backend).run(
+        key, program, schedule, init_chain_state, state_clamp, observation_carry_init, f_observe
+    )
+
+
+def _sample_with_observation_jax(
     key: Key[Array, ""],
     program: BlockSamplingProgram,
     schedule: SamplingSchedule,
@@ -427,24 +529,8 @@ def sample_with_observation(
     state_clamp: list[_State],
     observation_carry_init: ObserveCarry,
     f_observe: AbstractObserver,
-) -> tuple[ObserveCarry, list[PyTree[Shaped[Array, "n_samples nodes ?*state"]]]]:
-    """Run the full chain and call an Observer after every recorded sample.
-
-    **Arguments:**
-
-    - `key`: RNG key.
-    - `program`: The sampling program.
-    - `schedule`: Warm-up length, number of samples, number of steps between samples.
-    - `init_chain_state`: Initial free-block state.
-    - `state_clamp`: Clamped-block state.
-    - `observation_carry_init`: Initial carry handed to `f_observe`.
-    - `f_observe`: Observer instance.
-
-    **Returns:**
-
-    - Tuple `(final_observer_carry, samples)` where `samples` is a PyTree whose
-        leading axis has size `schedule.n_samples`.
-    """
+) -> tuple[ObserveCarry, PyTree]:
+    """Execute the JAX chain, observing the first record before the scan."""
     # run warmup
     sampler_states = jax.tree.map(
         lambda x: x.init(),
@@ -503,18 +589,27 @@ def sample_with_observation(
 
 def sample_states(
     key: Key[Array, ""],
-    program: BlockSamplingProgram,
+    program: "BlockSamplingProgram | IsingSamplingProgram",
     schedule: SamplingSchedule,
-    init_state_free: list[PyTree[Shaped[Array, "nodes ?*state"]]],
+    init_state_free: list[PyTree[Shaped[Array, "nodes ?*state"]]] | None,
     state_clamp: list[_State],
     nodes_to_sample: list[Block],
+    *,
+    backend: "SamplingBackend | None" = None,
 ) -> list[PyTree[Shaped[Array, "n_samples nodes ?*state"]]]:
     """Convenience wrapper to collect state information for *nodes_to_sample* only.
 
     Internally builds a [`thrml.StateObserver`][], runs
     [`thrml.sample_with_observation`][], and returns a stacked tensor of shape
-    `(schedule.n_samples, ...)`.
+    `(schedule.n_samples, ...)` for each requested block, in the requested node
+    order. `backend=None` uses JAX. `init_state_free=None` requests backend-owned
+    continuation, which JAX rejects; `[]` explicitly initializes zero free blocks.
     """
+    for block in nodes_to_sample:
+        for node in block:
+            if node not in program.gibbs_spec.node_global_location_map:
+                raise ValueError("Requested readout node is not in the sampling program.")
+
     f_observe = StateObserver(nodes_to_sample)
     carry_init = f_observe.init()
 
@@ -526,6 +621,7 @@ def sample_states(
         state_clamp,
         carry_init,
         f_observe,
+        backend=backend,
     )
 
     return results_out

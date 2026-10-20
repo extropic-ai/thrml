@@ -99,6 +99,30 @@ def test_class_members_render(site):
     assert 'id="Block.node_type"' in html, "Block.node_type property member missing"
 
 
+@pytest.mark.parametrize(
+    "page, symbols",
+    [
+        (
+            "api-backends.html",
+            [
+                "SamplingBackend",
+                "SamplingBackend.run",
+                "SamplingBackend.map_chains",
+                "JaxBackend",
+                "JaxBackend.compile",
+                "JaxBackend.run",
+                "JaxBackend.map_chains",
+            ],
+        ),
+        ("api-observers.html", ["SamplingContext", "SamplingContext.gibbs_spec"]),
+    ],
+)
+def test_backend_public_api_renders(site, page, symbols):
+    html = (site / page).read_text(encoding="utf-8")
+    for symbol in symbols:
+        assert f'id="{symbol}"' in html, f"missing public API entry: {symbol}"
+
+
 def test_no_abstractvar_leaks_into_pages(site):
     # _public_fields skips equinox AbstractVar / typing.ClassVar annotations, so an
     # abstract interface field never renders as a concrete attribute.

@@ -1,6 +1,7 @@
 import types
 import unittest
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 
@@ -38,3 +39,15 @@ class TestMomentObserver(unittest.TestCase):
             carry_out, _ = observer(self.program, state_free, [], carry, jnp.array(0, dtype=jnp.int32))
 
         self.assertEqual(carry_out[0][0], 2)
+
+
+def test_moment_observers_with_the_same_statistics_are_equal():
+    # A backend compiles the observer fold once for equal observers, so two calls of estimate_moments with the same
+    # nodes and edges must give equal observers.
+    from thrml.models.ising import _ising_moment_observer
+
+    nodes = [SpinNode() for _ in range(3)]
+    edges = [(nodes[0], nodes[1]), (nodes[1], nodes[2])]
+    first, second = (_ising_moment_observer(nodes, edges) for _ in range(2))
+    assert eqx.tree_equal(first, second)
+    assert not eqx.tree_equal(first, _ising_moment_observer(nodes, edges[:1]))
