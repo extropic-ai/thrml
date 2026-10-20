@@ -93,9 +93,12 @@ state when there are no free blocks. Explicit physical initialization is optiona
 and backend-owned, and may require additional device operations.
 
 For low-level JAX updates or access to `.samplers` and `.per_block_*`, convert an
-Ising program with `JaxBackend().compile(program)`. This produces the existing
-executable representation; it does not invoke `jax.jit`. Existing
-`BlockSamplingProgram` and `FactorSamplingProgram` objects remain executable.
+Ising program with `JaxBackend().compile(program)`. It uses a private JIT helper to
+reuse the graph and layout work while applying the current model parameters on
+every call. The first conversion compiles this helper; an enclosing JIT inlines it.
+The result is the existing executable representation. Compile again after changing
+the model parameters. Existing `BlockSamplingProgram` and `FactorSamplingProgram`
+objects are returned unchanged.
 See the [concepts guide](https://docs.thrml.ai/concepts.html) for portable observers,
 backend batching, and training.
 

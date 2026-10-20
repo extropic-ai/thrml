@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Callable
 
+import equinox as eqx
 import jax
 from jaxtyping import Array, Key, PyTree
 
@@ -18,6 +19,15 @@ if TYPE_CHECKING:
     from thrml.models.ising import IsingSamplingProgram
 
 
+# Equinox forwards JIT options, but its type overloads omit them.
+@eqx.filter_jit(inline=True)  # pyright: ignore[reportCallIssue]
+def _compile_ising(program: "IsingSamplingProgram") -> BlockSamplingProgram:
+    """Reuse structural lowering while keeping model parameters dynamic."""
+    spec = program.gibbs_spec
+    sampler = SpinGibbsConditional()
+    return FactorSamplingProgram(spec, [sampler for _ in spec.free_blocks], program.model.factors, [])
+
+
 class JaxBackend:
     """Stateless backend for THRML's existing JAX block-sampling algorithm.
 
@@ -29,12 +39,15 @@ class JaxBackend:
         """Lower a logical Ising program to the executable JAX representation.
 
         Existing `BlockSamplingProgram` and `FactorSamplingProgram` instances
-        are returned unchanged. Logical programs are lowered using their current
-        model factors, including beta, on each call. This is structural
-        conversion, not `jax.jit` or ahead-of-time compilation.
+        are returned unchanged. A private JIT helper reuses structural lowering
+        for the same graph, block layout, and parameter shapes/dtypes. Current
+        model factors, including beta, are evaluated on every call; numerical
+        targets are not cached. The first call for a new structure compiles the
+        conversion. Inside an enclosing JIT, this helper is inlined.
 
-        Use the returned program with `sample_blocks` or `sample_single_block`,
-        or to inspect `.samplers` and `.per_block_*` fields.
+        The result is an executable program, not a JIT-compiled sampling function.
+        Use it with `sample_blocks` or `sample_single_block`, or to inspect
+        `.samplers` and `.per_block_*` fields. Compile again after updating the model.
         """
         from thrml.models.ising import IsingSamplingProgram
 
@@ -43,9 +56,7 @@ class JaxBackend:
         if not isinstance(program, IsingSamplingProgram):
             raise TypeError("JaxBackend does not support this program type.")
 
-        spec = program.gibbs_spec
-        sampler = SpinGibbsConditional()
-        return FactorSamplingProgram(spec, [sampler for _ in spec.free_blocks], program.model.factors, [])
+        return _compile_ising(program)
 
     def run(
         self,

@@ -8,6 +8,7 @@ import pytest
 
 from thrml import (
     Block,
+    FactorSamplingProgram,
     JaxBackend,
     SamplingSchedule,
     SpinNode,
@@ -17,6 +18,7 @@ from thrml import (
     sample_with_observation,
 )
 from thrml.models import IsingEBM, IsingSamplingProgram, IsingTrainingSpec, estimate_kl_grad, estimate_moments
+from thrml.models.discrete_ebm import SpinGibbsConditional
 from thrml.models.ising import _ising_moment_observer
 
 
@@ -90,12 +92,72 @@ def test_logical_program_matches_the_compiled_program(ising):
     run = eqx.filter_jit(lambda p: sample_states(key, p, schedule, state, clamps, readout))
     for weights in (program.model.weights, -program.model.weights):
         logical = eqx.tree_at(lambda p: p.model.weights, program, weights)
-        compiled = JaxBackend().compile(logical)
+        compiled = FactorSamplingProgram(
+            logical.gibbs_spec,
+            [SpinGibbsConditional() for _ in logical.gibbs_spec.free_blocks],
+            logical.model.factors,
+            [],
+        )
+        assert JaxBackend().compile(compiled) is compiled
         expected = sample_states(key, compiled, schedule, state, clamps, readout)
         assert_tree_equal(sample_states(key, logical, schedule, state, clamps, readout), expected)
         assert_tree_equal(run(logical), run(compiled))
     with pytest.raises(TypeError, match="compile"):
         sample_blocks(key, state, clamps, program, [None, None])
+
+
+def test_compile_reuses_structure_with_fresh_parameters(monkeypatch):
+    import thrml.backends.jax as jax_backend
+
+    lowerings = []
+    constructor = jax_backend.FactorSamplingProgram
+
+    def counted_lowering(*args, **kwargs):
+        lowerings.append(1)
+        return constructor(*args, **kwargs)
+
+    monkeypatch.setattr(jax_backend, "FactorSamplingProgram", counted_lowering)
+    nodes = [SpinNode(), SpinNode()]
+    model = IsingEBM(nodes, [(nodes[0], nodes[1])], jnp.array([0.2, 0.4]), jnp.array([0.7]), jnp.array(1.3))
+    blocks = [Block([node]) for node in nodes]
+    program = IsingSamplingProgram(model, blocks, [])
+    backend = JaxBackend()
+
+    def fields(program, state_free, state_clamped, carry, iteration):
+        values = [
+            sum(jnp.sum(jnp.where(active, interaction.weights, 0)) for interaction, active in zip(interactions, masks))
+            for interactions, masks in zip(program.per_block_interactions, program.per_block_interaction_active)
+        ]
+        return carry, jnp.stack(values)
+
+    @eqx.filter_jit
+    def run(program):
+        return sample_with_observation(
+            jax.random.key(0),
+            program,
+            SamplingSchedule(0, 1, 0),
+            [jnp.array([True]), jnp.array([True])],
+            [],
+            None,
+            fields,
+            backend=backend,
+        )[1]
+
+    models = [
+        model,
+        eqx.tree_at(lambda m: m.biases, model, jnp.array([-0.3, 0.8])),
+        eqx.tree_at(lambda m: m.weights, model, jnp.array([-0.5])),
+        eqx.tree_at(lambda m: m.beta, model, jnp.array(2.1)),
+        model,
+    ]
+    for current in models:
+        logical = eqx.tree_at(lambda p: p.model, program, current)
+        compiled = backend.compile(logical)
+        expected = current.beta * (current.biases + current.weights[0])
+        np.testing.assert_allclose(fields(compiled, [], [], None, 0)[1], expected, rtol=1e-6)
+        np.testing.assert_allclose(run(logical), expected[None], rtol=1e-6)
+    backend.compile(IsingSamplingProgram(model, [Block([node]) for node in nodes], []))
+    assert len(lowerings) == 1
 
 
 def test_none_and_empty_initial_states(ising):
