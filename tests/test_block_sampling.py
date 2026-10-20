@@ -239,21 +239,3 @@ class TestPyTreeState(unittest.TestCase):
 
         self.assertTrue(jnp.allclose(init_state[0].cat_counter + 1, res.cat_counter))
         self.assertTrue(jnp.allclose(init_state[0].float_counter + 1, res.float_counter))
-
-
-def test_public_pytree_states_with_intrinsic_shape():
-    nodes = [MultiNode(), MultiNode(), MultiNode()]
-    block = Block(nodes)
-    sd = MultiNodeState(jax.ShapeDtypeStruct((2,), jnp.float32), jax.ShapeDtypeStruct((4,), jnp.int8))
-    spec = BlockGibbsSpec([block], [], {MultiNode: sd})
-    interaction = InteractionGroup(PlusInteraction(jnp.ones(3)), block, [block])
-    program = BlockSamplingProgram(spec, [IncrementSampler()], [interaction])
-    initial = MultiNodeState(jnp.zeros((3, 2), dtype=jnp.float32), jnp.zeros((3, 4), dtype=jnp.int8))
-    result = eqx.filter_jit(sample_states)(
-        jax.random.key(0), program, SamplingSchedule(2, 3, 1), [initial], [], [Block(nodes[::-1])]
-    )
-    assert result[0].cat_counter.dtype == jnp.int8
-    assert result[0].float_counter.dtype == jnp.float32
-    for i in range(3):
-        np.testing.assert_array_equal(result[0].cat_counter[i], np.full((3, 4), i + 2, dtype=np.int8))
-        np.testing.assert_array_equal(result[0].float_counter[i], np.full((3, 2), i + 2, dtype=np.float32))

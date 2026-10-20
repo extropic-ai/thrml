@@ -1,6 +1,5 @@
 import dataclasses
 from collections import defaultdict
-from numbers import Integral
 from typing import TYPE_CHECKING, Mapping, Sequence, Type, TypeAlias
 
 import equinox as eqx
@@ -419,7 +418,7 @@ def _run_blocks(
     return jax.lax.scan(body_fn, (init_chain_state, sampler_states), keys)[0]
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class SamplingSchedule:
     """
     Represents a sampling schedule for a process.
@@ -430,11 +429,11 @@ class SamplingSchedule:
     - `n_samples`: Positive number of records to collect.
     - `steps_per_sample`: Nonnegative number of steps between records.
 
-    Fields are static Python integers; Boolean values are not accepted. The
-    schedule remains mutable and is revalidated before execution. On JAX,
-    record `r` follows `n_warmup + r * steps_per_sample` sweeps. Backends define
-    how schedule steps relate to their execution; a step need not be a physical
-    write or an observation window.
+    Fields are static Python integers, checked once at construction; the
+    schedule is immutable. On JAX, record `r` follows
+    `n_warmup + r * steps_per_sample` sweeps. Backends define how schedule steps
+    relate to their execution; a step need not be a physical write or an
+    observation window.
     """
 
     n_warmup: int
@@ -442,19 +441,9 @@ class SamplingSchedule:
     steps_per_sample: int
 
     def __post_init__(self) -> None:
-        self.validate()
-
-    def validate(self) -> None:
-        """Raise TypeError for nonintegers or ValueError for invalid ranges."""
         for name, minimum in (("n_warmup", 0), ("n_samples", 1), ("steps_per_sample", 0)):
-            value = getattr(self, name)
-            if isinstance(value, bool) or not isinstance(value, Integral):
-                raise TypeError(f"{name} must be an integer, excluding bool.")
-            if value < minimum:
+            if getattr(self, name) < minimum:
                 raise ValueError(f"{name} must be >= {minimum}.")
-
-    def __hash__(self) -> int:
-        return hash((self.n_warmup, self.n_samples, self.steps_per_sample))
 
 
 def _validate_sampling_state(
@@ -508,7 +497,6 @@ def sample_with_observation(
     """
     from .backends import _resolve_backend
 
-    schedule.validate()
     _validate_sampling_state(program, init_chain_state, state_clamp)
     return _resolve_backend(backend).run(
         key, program, schedule, init_chain_state, state_clamp, observation_carry_init, f_observe
@@ -599,7 +587,6 @@ def sample_states(
     order. `backend=None` uses JAX. `init_state_free=None` requests backend-owned
     continuation, which JAX rejects; `[]` explicitly initializes zero free blocks.
     """
-    schedule.validate()
     for block in nodes_to_sample:
         for node in block:
             if node not in program.gibbs_spec.node_global_location_map:
