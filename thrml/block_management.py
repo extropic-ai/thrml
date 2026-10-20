@@ -101,11 +101,6 @@ def _hash_pytree(x: PyTree[jax.ShapeDtypeStruct]) -> _PyTreeStruct:
     return (jax.tree.structure(x), tuple(jax.tree.leaves(x)))
 
 
-def _type_order(item: tuple[Type[AbstractNode], _PyTreeStruct]) -> tuple[str, str]:
-    """A stable, import-independent ordering for node types."""
-    return (item[0].__module__, item[0].__qualname__)
-
-
 class BlockSpec:
     """
     This contains the necessary mappings for logging indices of states and node types.
@@ -135,9 +130,9 @@ class BlockSpec:
 
     A `BlockSpec` is everywhere a static argument to `jax.jit` — on its own, or as
     part of a `BlockSamplingProgram` — so it compares and hashes by value: two specs
-    built from equal blocks and equal node shape/dtypes are interchangeable, and
-    rebuilding one does not force a recompile. It must therefore not be mutated
-    after construction.
+    with the same blocks, node shape/dtypes, and global-state ordering are
+    interchangeable, and rebuilding one does not force a recompile. It must
+    therefore not be mutated after construction.
 
     **Attributes:**
 
@@ -235,16 +230,12 @@ class BlockSpec:
         self.node_global_location_map = node_global_location_map
 
     def _value_key(self) -> tuple:
-        """The constructor arguments this spec is derived from, as a hashable tuple.
-
-        Everything else a `BlockSpec` holds is computed from these, so two specs
-        with equal keys are interchangeable. Subclasses that take further
-        constructor arguments extend this.
-        """
-        node_sds = tuple(
-            (t.__module__, t.__qualname__, sd) for t, sd in sorted(self.node_shape_dtypes.items(), key=_type_order)
+        """Identify blocks, actual node classes, and the derived global-state order."""
+        return (
+            tuple(self.blocks),
+            frozenset(self.node_shape_dtypes.items()),
+            tuple(self.global_sd_order),
         )
-        return (tuple(self.blocks), node_sds)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, BlockSpec) or type(other) is not type(self):
