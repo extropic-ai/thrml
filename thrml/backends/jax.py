@@ -3,7 +3,13 @@ from typing import TYPE_CHECKING, Callable
 import jax
 from jaxtyping import Array, Key, PyTree
 
-from thrml.block_sampling import BlockSamplingProgram, SamplingSchedule, _sample_with_observation_jax, _State
+from thrml.block_sampling import (
+    BlockSamplingProgram,
+    SamplingSchedule,
+    _sample_with_observation_jax,
+    _State,
+    _validate_sampling_state,
+)
 from thrml.factor import FactorSamplingProgram
 from thrml.models.discrete_ebm import SpinGibbsConditional
 from thrml.observers import AbstractObserver, ObserveCarry
@@ -57,8 +63,10 @@ class JaxBackend:
         to samplers and interactions. The first record follows warmup; later
         records follow `steps_per_sample` further sweeps.
         """
+        schedule.validate()
         if init_state_free is None:
             raise ValueError("JaxBackend requires an explicit initial state. Chain continuation is unsupported.")
+        _validate_sampling_state(program, init_state_free, state_clamp)
         return _sample_with_observation_jax(
             key,
             self.compile(program),

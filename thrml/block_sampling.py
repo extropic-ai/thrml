@@ -1,5 +1,6 @@
 import dataclasses
 from collections import defaultdict
+from numbers import Integral
 from typing import TYPE_CHECKING, Mapping, Sequence, Type, TypeAlias
 
 import equinox as eqx
@@ -429,7 +430,8 @@ class SamplingSchedule:
 
     A schedule reaches `jax.jit` as a static argument, so it is hashed and compared
     by value and is frozen: mutating one in place would change the hash of a live
-    compilation-cache key. Build a new schedule (or `dataclasses.replace`) instead.
+    compilation-cache key and can reuse a result with the old record count.
+    Build a new schedule (or `dataclasses.replace`) instead.
 
     **Attributes:**
 
@@ -437,7 +439,8 @@ class SamplingSchedule:
     - `n_samples`: Positive number of records to collect.
     - `steps_per_sample`: Nonnegative number of steps between records.
 
-    The ranges are checked once at construction. On JAX, record `r` follows
+    Fields must be integers, excluding booleans. Types and ranges are checked at
+    construction and before execution. On JAX, record `r` follows
     `n_warmup + r * steps_per_sample` sweeps. Backends define how schedule steps
     relate to their execution; a step need not be a physical write or an
     observation window.
@@ -448,8 +451,15 @@ class SamplingSchedule:
     steps_per_sample: int
 
     def __post_init__(self) -> None:
+        self.validate()
+
+    def validate(self) -> None:
+        """Require integer fields, nonnegative sweep counts, and at least one record."""
         for name, minimum in (("n_warmup", 0), ("n_samples", 1), ("steps_per_sample", 0)):
-            if getattr(self, name) < minimum:
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, Integral):
+                raise TypeError(f"{name} must be an integer, excluding bool.")
+            if value < minimum:
                 raise ValueError(f"{name} must be >= {minimum}.")
 
 
@@ -504,6 +514,7 @@ def sample_with_observation(
     """
     from .backends import _resolve_backend
 
+    schedule.validate()
     _validate_sampling_state(program, init_chain_state, state_clamp)
     return _resolve_backend(backend).run(
         key, program, schedule, init_chain_state, state_clamp, observation_carry_init, f_observe

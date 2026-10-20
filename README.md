@@ -99,6 +99,10 @@ executable representation; it does not invoke `jax.jit`. Existing
 See the [concepts guide](https://docs.thrml.ai/concepts.html) for portable observers,
 backend batching, and training.
 
+Sampling schedules are immutable because JAX uses them as compilation-cache keys.
+Mutating a cached schedule can reuse a computation with the old record count.
+Use `dataclasses.replace(schedule, n_samples=100)` to create an updated schedule.
+
 ## More Examples
 
 For a more extensive example, see the [dtm-replication](https://github.com/pschilliOrange/dtm-replication) repository which runs on THRML.

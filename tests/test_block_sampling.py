@@ -246,6 +246,19 @@ class TestPyTreeState(unittest.TestCase):
 class TestSamplingSchedule(unittest.TestCase):
     """A schedule is a static `jax.jit` argument, so it is a frozen value."""
 
+    def test_invalid_fields_are_rejected(self):
+        for field, value, error in (
+            ("n_warmup", True, TypeError),
+            ("n_samples", 1.5, TypeError),
+            ("n_samples", np.nan, TypeError),
+            ("steps_per_sample", -1, ValueError),
+        ):
+            with self.subTest(field=field, value=value):
+                fields = dict(n_warmup=0, n_samples=1, steps_per_sample=0)
+                fields[field] = value
+                with self.assertRaisesRegex(error, field):
+                    SamplingSchedule(**fields)
+
     def test_schedules_with_the_same_fields_are_interchangeable(self):
         self.assertEqual(SamplingSchedule(3, 2, 1), SamplingSchedule(3, 2, 1))
         self.assertEqual(hash(SamplingSchedule(3, 2, 1)), hash(SamplingSchedule(3, 2, 1)))

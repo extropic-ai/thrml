@@ -37,6 +37,7 @@ class SerialBackend:
 
     def __init__(self):
         self.runs = []
+        self.maps = 0
         self.states = {}
 
     def run(self, key, program, schedule, init_state_free, state_clamp, observation_carry_init, f_observe):
@@ -52,6 +53,7 @@ class SerialBackend:
         return carry, stack(outputs)
 
     def map_chains(self, fn, *batched_args):
+        self.maps += 1
         n = jax.tree.leaves(batched_args)[0].shape[0]
         return stack([fn(*jax.tree.map(lambda x: x[i], batched_args)) for i in range(n)])
 
@@ -237,8 +239,12 @@ def test_training_through_an_external_backend(explicit):
     assert backend.runs[-1][3] is case["conditioning_values"]
 
 
-def test_fully_clamped_positive_phase_bypasses_the_backend():
+@pytest.mark.parametrize("initial", [[], None])
+@pytest.mark.parametrize("dtype", [jnp.float16, jnp.float32])
+def test_fully_clamped_positive_phase_bypasses_the_backend(initial, dtype):
     case = training_case(fully_clamped=True)
+    case["init_state_positive"] = initial
+    case["training_spec"] = jax.tree.map(lambda x: x.astype(dtype) if eqx.is_array(x) else x, case["training_spec"])
     backend = SerialBackend()
     _, _, (biases, weights), _ = estimate_kl_grad(**case, backend=backend)
 
@@ -246,12 +252,17 @@ def test_fully_clamped_positive_phase_bypasses_the_backend():
     spins = 2 * jnp.concatenate([case["data"][0], jnp.ones((3, 1), dtype=jnp.bool_)], axis=1).astype(jnp.float32) - 1
     np.testing.assert_array_equal(biases, spins[None])
     np.testing.assert_array_equal(weights, (spins[:, [0, 1, 2]] * spins[:, [2, 3, 4]])[None])
-    assert biases.dtype == weights.dtype == case["training_spec"].ebm.beta.dtype
+    assert biases.dtype == weights.dtype == jnp.float32
 
 
 def test_jax_training_matches_the_default():
     case = training_case()
-    assert_tree_equal(estimate_kl_grad(**case, backend=JaxBackend()), estimate_kl_grad(**case))
+    expected = estimate_kl_grad(**case)
+    assert_tree_equal(estimate_kl_grad(**case, backend=JaxBackend()), expected)
+    compiled = eqx.filter_jit(estimate_kl_grad)(**case)
+    assert_tree_equal(compiled[2:], expected[2:])
+    for actual, eager in zip(compiled[:2], expected[:2]):
+        np.testing.assert_allclose(actual, eager, rtol=1e-6, atol=1e-7)
 
 
 def test_training_spec_rejects_inconsistent_free_nodes():
@@ -275,4 +286,59 @@ def test_training_rejects_a_bad_negative_state_before_running():
     backend = SerialBackend()
     with pytest.raises(RuntimeError, match="block length"):
         estimate_kl_grad(**case, backend=backend)
-    assert not backend.runs
+    assert not backend.runs and backend.maps == 0
+
+
+@pytest.mark.parametrize(
+    "argument,shape,match",
+    [
+        ("init_state_negative", (4,), "rank 2"),
+        ("init_state_negative", (0, 4), "replica count"),
+        ("init_state_positive", (2, 2, 2), "data batch"),
+        ("data", (0, 2), "nonempty batch"),
+        ("conditioning_values", (3, 1), "rank 1"),
+    ],
+)
+def test_training_rejects_bad_dimensions_before_any_backend_operation(argument, shape, match):
+    case = training_case()
+    case[argument] = [jnp.ones(shape, dtype=jnp.bool_)]
+    backend = SerialBackend()
+    with pytest.raises(ValueError, match=match):
+        estimate_kl_grad(**case, backend=backend)
+    assert backend.maps == 0 and not backend.runs
+
+
+@pytest.mark.parametrize("kind", ["bias", "edge"])
+def test_training_layout_covers_unrequested_model_nodes(kind):
+    case = training_case()
+    spec, extra = case["training_spec"], SpinNode()
+    model = spec.ebm
+    if kind == "bias":
+        model = eqx.tree_at(lambda m: (m.nodes, m.biases), model, (model.nodes + [extra], jnp.zeros(6)))
+    else:
+        model = eqx.tree_at(
+            lambda m: (m.edges, m.weights), model, (model.edges + [(model.nodes[0], extra)], jnp.zeros(4))
+        )
+    backend = SerialBackend()
+    with pytest.raises(ValueError, match="cover every model"):
+        IsingTrainingSpec(
+            model,
+            spec.program_positive.gibbs_spec.clamped_blocks[:1],
+            spec.program_negative.gibbs_spec.clamped_blocks,
+            spec.program_positive.gibbs_spec.free_blocks,
+            spec.program_negative.gibbs_spec.free_blocks,
+            spec.schedule_positive,
+            spec.schedule_negative,
+        )
+    # tree_at bypasses construction; execution must still reject an invalid layout.
+    case["training_spec"] = eqx.tree_at(lambda s: s.ebm, spec, model)
+    with pytest.raises(ValueError, match="cover every model"):
+        estimate_kl_grad(**case, backend=backend)
+    assert backend.maps == 0 and not backend.runs
+
+
+def test_direct_jax_run_rejects_bad_dtype_without_sweeps(ising):
+    program, state, clamps = ising
+    state[0] = state[0].astype(jnp.float32)
+    with pytest.raises(RuntimeError, match="incorrect type"):
+        JaxBackend().run(jax.random.key(0), program, SamplingSchedule(0, 1, 0), state, clamps, None, StateObserver([]))

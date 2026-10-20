@@ -138,16 +138,32 @@ class IsingTrainingSpec(eqx.Module):
         self.program_positive = IsingSamplingProgram(ebm, positive_sampling_blocks, data_blocks + conditioning_blocks)
         self.program_negative = IsingSamplingProgram(ebm, negative_sampling_blocks, conditioning_blocks)
 
-        # The positive clamped blocks are the data blocks followed by the negative clamped blocks by construction, so
-        # the negative phase must sample exactly the positive free nodes and the data nodes.
-        positive_free = {node for block in self.program_positive.gibbs_spec.free_blocks for node in block}
-        negative_free = {node for block in self.program_negative.gibbs_spec.free_blocks for node in block}
-        data_nodes = {node for block in data_blocks for node in block}
-        if negative_free != positive_free | data_nodes:
-            raise ValueError("Negative free nodes must equal positive free nodes plus data nodes.")
-
+        _validate_training_layout(self)
         self.schedule_positive = schedule_positive
         self.schedule_negative = schedule_negative
+
+
+def _validate_training_layout(training_spec):
+    positive = training_spec.program_positive.gibbs_spec
+    negative = training_spec.program_negative.gibbs_spec
+    n_data_blocks = len(positive.clamped_blocks) - len(negative.clamped_blocks)
+    if n_data_blocks < 1:
+        raise ValueError("Training requires at least one data block.")
+    if positive.clamped_blocks[n_data_blocks:] != negative.clamped_blocks:
+        raise ValueError("Positive conditioning blocks must match the negative clamped blocks.")
+
+    data_nodes = {node for block in positive.clamped_blocks[:n_data_blocks] for node in block}
+    positive_free = {node for block in positive.free_blocks for node in block}
+    negative_free = {node for block in negative.free_blocks for node in block}
+    if negative_free != positive_free | data_nodes:
+        raise ValueError("Negative free nodes must equal positive free nodes plus data nodes.")
+
+    model = training_spec.ebm
+    model_nodes = set(model.nodes) | {node for edge in model.edges for node in edge}
+    for name, spec in (("positive", positive), ("negative", negative)):
+        if not model_nodes.issubset(spec.node_global_location_map):
+            raise ValueError(f"The {name} layout must cover every model bias node and edge endpoint.")
+    return n_data_blocks
 
 
 @eqx.filter_jit
@@ -254,9 +270,55 @@ def _map_with_optional_initial_state(backend, fn, keys, initial_states, *batched
     return backend.map_chains(fn, keys, initial_states, *batched_args)
 
 
-def _fully_clamped_moments(program, observer, clamped_state, float_type):
+def _fully_clamped_moments(program, observer, clamped_state):
     sums, _ = observer(program, [], clamped_state, observer.init(), jnp.array(0))
-    return tuple(x.astype(float_type) for x in sums)
+    return tuple(x / 1 for x in sums)
+
+
+def _validate_training_state(
+    training_spec, bias_nodes, weight_edges, data, conditioning_values, init_state_positive, init_state_negative
+):
+    """Check both phases before any backend operation, using only static array metadata."""
+    n_data_blocks = _validate_training_layout(training_spec)
+    positive, negative = training_spec.program_positive, training_spec.program_negative
+    training_spec.schedule_positive.validate()
+    training_spec.schedule_negative.validate()
+    if len(data) != n_data_blocks:
+        raise ValueError("data must have one array per data block.")
+    if len(conditioning_values) != len(negative.gibbs_spec.clamped_blocks):
+        raise ValueError("conditioning_values must have one array per conditioning block.")
+
+    for name, arrays, rank in (
+        ("data", data, 2),
+        ("conditioning_values", conditioning_values, 1),
+        ("init_state_positive", init_state_positive, 3),
+        ("init_state_negative", init_state_negative, 2),
+    ):
+        if arrays is not None and any(getattr(array, "ndim", None) != rank for array in arrays):
+            raise ValueError(f"{name} arrays must have rank {rank}.")
+    batch_size = data[0].shape[0]
+    if batch_size < 1 or any(array.shape[0] != batch_size for array in data):
+        raise ValueError("data arrays must share a nonempty batch dimension.")
+
+    replicas = []
+    for name, program, initial in (
+        ("positive", positive, init_state_positive),
+        ("negative", negative, init_state_negative),
+    ):
+        if initial is not None and len(initial) != len(program.gibbs_spec.free_blocks):
+            raise ValueError(f"init_state_{name} must have one array per free block.")
+        n_chains = initial[0].shape[0] if initial else 1
+        if n_chains < 1 or (initial is not None and any(array.shape[0] != n_chains for array in initial)):
+            raise ValueError(f"init_state_{name} arrays must share a positive replica count.")
+        replicas.append(n_chains)
+    if init_state_positive is not None and any(array.shape[1] != batch_size for array in init_state_positive):
+        raise ValueError("init_state_positive arrays must match the data batch dimension.")
+
+    _validate_moment_nodes(positive, bias_nodes, weight_edges, "positive")
+    _validate_moment_nodes(negative, bias_nodes, weight_edges, "negative")
+    _validate_sampling_state(positive, init_state_positive, data + conditioning_values)
+    _validate_sampling_state(negative, init_state_negative, conditioning_values)
+    return batch_size, *replicas, not positive.gibbs_spec.free_blocks
 
 
 def estimate_kl_grad(
@@ -313,29 +375,22 @@ def estimate_kl_grad(
 
     from thrml.backends import _resolve_backend
 
-    # Both phases are checked here, so a bad request is refused before a backend does any work for the first phase.
-    _validate_moment_nodes(training_spec.program_positive, bias_nodes, weight_edges, "positive")
-    _validate_moment_nodes(training_spec.program_negative, bias_nodes, weight_edges, "negative")
-    _validate_sampling_state(training_spec.program_positive, init_state_positive, data + conditioning_values)
-    _validate_sampling_state(training_spec.program_negative, init_state_negative, conditioning_values)
+    batch_size, n_positive, n_negative, fully_clamped = _validate_training_state(
+        training_spec, bias_nodes, weight_edges, data, conditioning_values, init_state_positive, init_state_negative
+    )
     backend = _resolve_backend(backend)
     float_type = training_spec.ebm.beta.dtype
-    batch_size = data[0].shape[0]
-    fully_clamped = not training_spec.program_positive.gibbs_spec.free_blocks
     key_pos, key_neg = jax.random.split(key, 2)
     cond_batched_pos = jax.tree.map(lambda x: jnp.broadcast_to(x, (batch_size, *x.shape)), conditioning_values)
 
     if fully_clamped:
         observer = _ising_moment_observer(bias_nodes, weight_edges)
         moms_b_pos, moms_w_pos = jax.vmap(
-            lambda clamps: _fully_clamped_moments(training_spec.program_positive, observer, clamps, float_type)
+            lambda clamps: _fully_clamped_moments(training_spec.program_positive, observer, clamps)
         )(data + cond_batched_pos)
         moms_b_pos = moms_b_pos[None]
         moms_w_pos = moms_w_pos[None]
     else:
-        if init_state_positive is not None and len(init_state_positive) == 0:
-            raise ValueError("init_state_positive is required when the positive program has free blocks.")
-        n_positive = 1 if init_state_positive is None else init_state_positive[0].shape[0]
         keys_pos = jax.random.split(key_pos, (n_positive, batch_size))
 
         def positive_one(key_i, initial_i, clamps_i):
@@ -371,7 +426,6 @@ def estimate_kl_grad(
             backend=backend,
         )
 
-    n_negative = 1 if init_state_negative is None else init_state_negative[0].shape[0]
     keys_neg = jax.random.split(key_neg, n_negative)
     moms_b_neg, moms_w_neg = _map_with_optional_initial_state(backend, negative_one, keys_neg, init_state_negative)
 
