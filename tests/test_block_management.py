@@ -350,6 +350,12 @@ class TestBlockSpecValueSemantics(unittest.TestCase):
         self.assertEqual(grouped.free_blocks, separate.free_blocks)
         self.assertNotEqual(grouped, separate)
 
+    def test_a_superblock_given_as_a_list_is_its_tuple(self):
+        as_list = block_sampling.BlockGibbsSpec([[self.block_1, self.block_2]], [], self.node_sd)
+        as_tuple = block_sampling.BlockGibbsSpec([(self.block_1, self.block_2)], [], self.node_sd)
+        self.assertEqual(as_list, as_tuple)
+        self.assertEqual(hash(as_list), hash(as_tuple))
+
     def test_a_gibbs_spec_is_never_equal_to_a_plain_spec(self):
         gibbs = block_sampling.BlockGibbsSpec([self.block_1], [], self.node_sd)
         plain = self._spec([self.block_1])
