@@ -404,3 +404,12 @@ def test_direct_jax_run_rejects_bad_dtype_without_sweeps(ising):
     state[0] = state[0].astype(jnp.float32)
     with pytest.raises(RuntimeError, match="incorrect type"):
         JaxBackend().run(jax.random.key(0), program, SamplingSchedule(0, 1, 0), state, clamps, None, StateObserver([]))
+
+
+def test_a_superblock_may_be_a_list():
+    nodes = [SpinNode() for _ in range(3)]
+    model = IsingEBM(nodes, [(nodes[0], nodes[1]), (nodes[1], nodes[2])], jnp.zeros(3), jnp.ones(2), jnp.array(1.0))
+    program = IsingSamplingProgram(model, [[Block(nodes[:1]), Block(nodes[2:])], Block(nodes[1:2])], [])
+    state = [jnp.array([True]), jnp.array([False]), jnp.array([True])]
+    samples = sample_states(jax.random.key(0), program, SamplingSchedule(1, 2, 1), state, [], [Block(nodes)])
+    assert samples[0].shape == (2, 3)
