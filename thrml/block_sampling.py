@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 # in between (so same algorithmic, but not computation time)
 # This could be used if you have need to break blocks up for e.g. different
 # samplers/nodes
-SuperBlock: TypeAlias = Sequence[Block] | Block
+SuperBlock: TypeAlias = tuple[Block, ...] | Block
 _SD: TypeAlias = Mapping[Type[AbstractNode], PyTree[jax.ShapeDtypeStruct]]
 
 
@@ -76,7 +76,7 @@ class BlockGibbsSpec(BlockSpec):
         **Arguments:**
 
         - `free_super_blocks`: An ordered sequence where each element is either
-            a single `Block`, or a sequence of blocks that must share the same global
+            a single `Block`, or a tuple of blocks that must share the same global
             state when calling their individual samplers.
         - `clamped_blocks`: Blocks whose nodes stay fixed during sampling.
         - `node_shape_dtypes`: Mapping from node class to a PyTree of
@@ -90,7 +90,6 @@ class BlockGibbsSpec(BlockSpec):
             if isinstance(super_block, Block):
                 blocks = (super_block,)
             else:
-                # Copied into a tuple for the same reason as `BlockSpec.blocks`: it is part of the hash.
                 blocks = tuple(super_block)
 
             superblocks.append(blocks)
