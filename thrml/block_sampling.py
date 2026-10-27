@@ -90,7 +90,7 @@ class BlockGibbsSpec(BlockSpec):
             if isinstance(super_block, Block):
                 blocks = (super_block,)
             else:
-                blocks = super_block
+                blocks = tuple(super_block)
 
             superblocks.append(blocks)
             sampling_group = []
