@@ -362,6 +362,7 @@ def sample_blocks(
     verify_block_state(program.gibbs_spec.free_blocks, state_free, sds, -1)
     verify_block_state(program.gibbs_spec.clamped_blocks, clamp_state, sds, -1)
 
+    state_free, sampler_state = list(state_free), list(sampler_state)
     keys = jax.random.split(key, (len(program.gibbs_spec.free_blocks),))
     for sampling_group in program.gibbs_spec.sampling_order:
         global_state = block_state_to_global(state_free + clamp_state, program.gibbs_spec)
