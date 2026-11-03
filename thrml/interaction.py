@@ -51,8 +51,6 @@ class InteractionGroup(eqx.Module):
             if not len(block.nodes) == interaction_size:
                 raise RuntimeError("All tail node blocks must have the same length as head_nodes")
 
-        # `eqx.is_array` is the predicate `_tree_slice` uses to decide which leaves get gathered
-        # along axis 0 during sampling, so validation has to use it too or the two disagree.
         def _get_dim(x):
             return (-1 if not len(x.shape) else x.shape[0]) if eqx.is_array(x) else interaction_size
 
