@@ -10,6 +10,7 @@ from .ebm import AbstractEBM as AbstractEBM
 from .ebm import AbstractFactorizedEBM as AbstractFactorizedEBM
 from .ebm import EBMFactor as EBMFactor
 from .ebm import FactorizedEBM as FactorizedEBM
+from .ebm import contrastive_divergence_loss as contrastive_divergence_loss
 from .ising import IsingEBM as IsingEBM
 from .ising import IsingSamplingProgram as IsingSamplingProgram
 from .ising import IsingTrainingSpec as IsingTrainingSpec
