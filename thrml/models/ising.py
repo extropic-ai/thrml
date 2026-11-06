@@ -61,6 +61,10 @@ class IsingEBM(AbstractFactorizedEBM):
         - `weights`: Weight values for each edge
         - `beta`: Temperature parameter
         """
+        edge_types = {type(endpoint) for edge in edges for endpoint in edge}
+        if not all(issubclass(t, AbstractNode) for t in edge_types):
+            raise TypeError(f"Edge endpoints must be AbstractNode instances, got {edge_types}.")
+
         # nodes should be same type, should be at least one node passed in
         sd_map = {nodes[0].__class__: jax.ShapeDtypeStruct((), jnp.bool_)}
 
