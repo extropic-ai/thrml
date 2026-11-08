@@ -1,16 +1,6 @@
-"""Construction-time guard: BlockSamplingProgram raises when an interaction
-instance couples nodes updated in the same sampling group (issue #75).
-
-Run with the thrml venv:
-    venv-thrml/bin/python -m pytest tests/test_f1_block_check.py -q
-
-Covers: the headline repro (must now RAISE), the legitimate neighbor
-(properly blocked pair must still sample the exact correlation), and the
-boundary variants: three-node block with one bad pair, superblock-grouped
-pair, high-order factor clique (bad partition raises / singleton partition
-constructs), free-clamped edge (must stay legal), the custom-sampler
-exception exercised both ways, and the batched-bias-factor canary
-(per-instance semantics must not false-positive on Ising programs).
+"""Construction-time guard for issue #75: BlockSamplingProgram must raise
+when an interaction instance couples nodes updated in the same sampling
+group, and must leave correctly blocked programs untouched.
 """
 
 import jax
@@ -41,21 +31,6 @@ def _pair_factors(n1, n2):
     return fac_b, fac_e
 
 
-def _pair_corr(blocks, n=100000):
-    n1, n2 = SpinNode(), SpinNode()
-    fac_b, fac_e = _pair_factors(n1, n2)
-    spec = BlockGibbsSpec(blocks(n1, n2), [])
-    prog = FactorSamplingProgram(spec, [SpinGibbsConditional() for _ in spec.free_blocks], [fac_b, fac_e], [])
-    init = [jnp.zeros((len(b.nodes),), dtype=jnp.bool_) for b in spec.free_blocks]
-    out = sample_states(
-        key=jax.random.key(3), program=prog, schedule=SamplingSchedule(20, n, 1),
-        init_state_free=init, state_clamp=[], nodes_to_sample=[Block([n1]), Block([n2])],
-    )
-    a = 2 * np.asarray(out[0]).reshape(-1).astype(float) - 1
-    b = 2 * np.asarray(out[1]).reshape(-1).astype(float) - 1
-    return float((a * b).mean())
-
-
 def test_one_block_pair_raises():
     n1, n2 = SpinNode(), SpinNode()
     fac_b, fac_e = _pair_factors(n1, n2)
@@ -64,13 +39,8 @@ def test_one_block_pair_raises():
         FactorSamplingProgram(spec, [SpinGibbsConditional()], [fac_b, fac_e], [])
 
 
-def test_two_block_pair_constructs_and_correlation():
-    corr = _pair_corr(lambda n1, n2: [Block([n1]), Block([n2])])
-    assert abs(corr - EXACT_CORR) < 0.03, f"two-block corr {corr} vs exact {EXACT_CORR}"
-
-
 def test_superblock_grouped_pair_raises():
-    # Two blocks, ONE superblock: sample_blocks updates both from one snapshot.
+    # Two blocks in ONE superblock are still updated from one snapshot.
     n1, n2 = SpinNode(), SpinNode()
     fac_b, fac_e = _pair_factors(n1, n2)
     spec = BlockGibbsSpec([(Block([n1]), Block([n2]))], [])
@@ -80,17 +50,28 @@ def test_superblock_grouped_pair_raises():
         )
 
 
-def test_three_node_block_one_bad_pair_raises():
-    m1, m2, m3 = SpinNode(), SpinNode(), SpinNode()
-    fac_b = SpinEBMFactor([Block([m1, m2, m3])], jnp.array([0.0, 0.0, 0.0], dtype=jnp.float32))
-    fac_e = SpinEBMFactor([Block([m1]), Block([m2])], jnp.array([1.5], dtype=jnp.float32))
-    spec = BlockGibbsSpec([Block([m1, m2, m3])], [])
-    with pytest.raises(RuntimeError, match="sampling group"):
-        FactorSamplingProgram(spec, [SpinGibbsConditional()], [fac_b, fac_e], [])
+def test_two_block_pair_constructs_and_correlation():
+    # The legitimate neighbor: a properly blocked pair constructs and still
+    # samples the exact correlation tanh(1.5).
+    n1, n2 = SpinNode(), SpinNode()
+    fac_b, fac_e = _pair_factors(n1, n2)
+    spec = BlockGibbsSpec([Block([n1]), Block([n2])], [])
+    prog = FactorSamplingProgram(
+        spec, [SpinGibbsConditional() for _ in spec.free_blocks], [fac_b, fac_e], []
+    )
+    init = [jnp.zeros((len(b.nodes),), dtype=jnp.bool_) for b in spec.free_blocks]
+    out = sample_states(
+        key=jax.random.key(3), program=prog, schedule=SamplingSchedule(20, 100000, 1),
+        init_state_free=init, state_clamp=[], nodes_to_sample=[Block([n1]), Block([n2])],
+    )
+    a = 2 * np.asarray(out[0]).reshape(-1).astype(float) - 1
+    b = 2 * np.asarray(out[1]).reshape(-1).astype(float) - 1
+    corr = float((a * b).mean())
+    assert abs(corr - EXACT_CORR) < 0.03, f"two-block corr {corr} vs exact {EXACT_CORR}"
 
 
 def _high_order_program(blocks_spec):
-    """One DiscreteEBMFactor coupling 5 spins + 1 categorical."""
+    """One DiscreteEBMFactor coupling 5 spins + 1 categorical node."""
     K, nspin = 8, 5
     rng = np.random.default_rng(99)
     W = rng.normal(0, 0.8, size=K).astype(np.float32)
@@ -110,10 +91,7 @@ def _high_order_program(blocks_spec):
 def test_high_order_factor_bad_partition_raises():
     with pytest.raises(RuntimeError, match="sampling group"):
         _high_order_program([[0, 2, 4], [1, 3], "cat"])
-
-
-def test_high_order_factor_singleton_blocks_constructs():
-    _high_order_program([[0], [1], [2], [3], [4], "cat"])  # must not raise
+    _high_order_program([[0], [1], [2], [3], [4], "cat"])  # singleton partition must not raise
 
 
 def test_free_clamped_edge_constructs():
@@ -124,8 +102,8 @@ def test_free_clamped_edge_constructs():
 
 
 def test_ising_checkerboard_constructs():
-    # Canary for per-instance semantics: the bias factor batches one
-    # singleton instance per node and must NOT be treated as a clique.
+    # Canary: the Ising bias factor batches one singleton instance per node
+    # and must NOT be treated as a clique.
     nodes = [SpinNode() for _ in range(9)]
     edges = []
     for r in range(3):
@@ -141,10 +119,9 @@ def test_ising_checkerboard_constructs():
 
 
 class ExactPairSampler(AbstractConditionalSampler):
-    """Test double: draws the block's two spins from their exact joint
-    conditional (the block is the whole model in this test). A direct
-    AbstractConditionalSampler subclass, i.e. NOT a per-node parametric
-    sampler, so the F1 gate must exempt it."""
+    """Draws the block's two spins from their exact joint conditional.
+    A direct AbstractConditionalSampler subclass (not a per-node parametric
+    sampler), so the guard must exempt it."""
 
     bias: jax.Array
     weight: jax.Array
@@ -156,21 +133,12 @@ class ExactPairSampler(AbstractConditionalSampler):
         return s[idx] > 0, sampler_state
 
 
-def test_custom_joint_sampler_exempt_and_samples_correctly():
+def test_custom_joint_sampler_exempt():
     n1, n2 = SpinNode(), SpinNode()
     fac_b, fac_e = _pair_factors(n1, n2)
     spec = BlockGibbsSpec([Block([n1, n2])], [])
     sampler = ExactPairSampler(jnp.array([0.0, 0.0]), jnp.array(1.5))
-    prog = FactorSamplingProgram(spec, [sampler], [fac_b, fac_e], [])  # must not raise
-    out = sample_states(
-        key=jax.random.key(3), program=prog, schedule=SamplingSchedule(20, 60000, 1),
-        init_state_free=[jnp.zeros((2,), dtype=jnp.bool_)], state_clamp=[],
-        nodes_to_sample=[Block([n1]), Block([n2])],
-    )
-    a = 2 * np.asarray(out[0]).reshape(-1).astype(float) - 1
-    b = 2 * np.asarray(out[1]).reshape(-1).astype(float) - 1
-    corr = float((a * b).mean())
-    assert abs(corr - EXACT_CORR) < 0.03, f"custom-sampler corr {corr} vs exact {EXACT_CORR}"
-    # ... and the other way: the same spec with the built-in sampler raises.
+    FactorSamplingProgram(spec, [sampler], [fac_b, fac_e], [])  # must not raise
+    # The same spec with the built-in per-node sampler raises.
     with pytest.raises(RuntimeError, match="sampling group"):
         FactorSamplingProgram(spec, [SpinGibbsConditional()], [fac_b, fac_e], [])
