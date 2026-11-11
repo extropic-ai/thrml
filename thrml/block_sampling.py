@@ -13,7 +13,7 @@ from thrml.block_management import Block, BlockSpec, block_state_to_global, veri
 from thrml.interaction import InteractionGroup
 from thrml.pgm import DEFAULT_NODE_SHAPE_DTYPES, AbstractNode
 
-from .conditional_samplers import AbstractConditionalSampler, _SamplerState
+from .conditional_samplers import AbstractConditionalSampler, AbstractParametricConditionalSampler, _SamplerState
 from .observers import AbstractObserver, ObserveCarry, SamplingContext, StateObserver
 
 if TYPE_CHECKING:
@@ -117,6 +117,104 @@ def _tree_slice(x, sl):
     return x
 
 
+def _validate_sampling_groups(
+    gibbs_spec: BlockGibbsSpec,
+    samplers: list[AbstractConditionalSampler],
+    interaction_groups: list[InteractionGroup],
+) -> None:
+    """Raise if an interaction instance couples free nodes updated together.
+
+    All blocks in one sampling group are updated from a single state snapshot,
+    so a simultaneous update is only exact when the nodes updated together are
+    conditionally independent given the rest. If two distinct free nodes of one
+    interaction instance land in the same sampling group, per-node samplers
+    evaluate their coupling at stale pre-update values and the program silently
+    samples the wrong distribution. A block whose sampler is not in the
+    per-node `AbstractParametricConditionalSampler` family is exempt: such a
+    sampler may draw its block's nodes jointly, and its author owns the
+    correctness of the simultaneous update.
+    """
+    free_block_of_node = {}
+    sampling_group_of_block = {}
+    for group_idx, group in enumerate(gibbs_spec.sampling_order):
+        for block_idx in group:
+            sampling_group_of_block[block_idx] = group_idx
+    for block_idx, block in enumerate(gibbs_spec.free_blocks):
+        sg = sampling_group_of_block[block_idx]
+        for node in block.nodes:
+            free_block_of_node[node] = (block_idx, sg)
+
+    parametric_block = [isinstance(s, AbstractParametricConditionalSampler) for s in samplers]
+
+    def _fail(group_idx, instance_idx, n_nodes, sampling_group_idx, involved_blocks):
+        raise RuntimeError(
+            f"Interaction group {group_idx} (instance {instance_idx}) couples {n_nodes} "
+            f"nodes that are all updated in sampling group {sampling_group_idx} "
+            f"(free blocks {involved_blocks}). Blocks in one sampling group are "
+            "updated from the same state snapshot, so per-node conditional "
+            "samplers would evaluate this coupling at stale values and silently "
+            "sample the wrong distribution. Re-block so that the nodes coupled "
+            "by every interaction instance are split across different sampling "
+            "groups (e.g. with a proper graph coloring), or update the coupled "
+            "nodes with a sampler that draws them jointly."
+        )
+
+    get = free_block_of_node.get
+    for group_idx, interaction_group in enumerate(interaction_groups):
+        head_nodes = interaction_group.head_nodes.nodes
+        tail_blocks = interaction_group.tail_nodes
+        if not tail_blocks:
+            # Singleton instances (e.g. bias factors) couple nothing.
+            continue
+        if len(tail_blocks) == 1:
+            # Pairwise fast path: no per-instance allocation on the clean path.
+            tails = tail_blocks[0].nodes
+            for i in range(len(head_nodes)):
+                h, t = head_nodes[i], tails[i]
+                if h is t:
+                    continue
+                eh = get(h)
+                if eh is None:
+                    continue
+                et = get(t)
+                if et is None or et[1] != eh[1]:
+                    continue
+                if parametric_block[eh[0]] or parametric_block[et[0]]:
+                    _fail(group_idx, i, 2, eh[1], sorted({eh[0], et[0]}))
+            continue
+        # General k-way path.
+        tail_nodes = [tb.nodes for tb in tail_blocks]
+        for i in range(len(head_nodes)):
+            seen: dict = {}
+            collision_sg = -1
+            node = head_nodes[i]
+            e = get(node)
+            if e is not None:
+                seen[e[1]] = node
+            for t in tail_nodes:
+                node = t[i]
+                e = get(node)
+                if e is None:
+                    continue
+                prev = seen.get(e[1])
+                if prev is None:
+                    seen[e[1]] = node
+                elif prev is not node:
+                    collision_sg = e[1]
+                    break
+            if collision_sg >= 0:
+                # Rebuild the colliding set for the error message.
+                colliding = []
+                nodes = [head_nodes[i]] + [t[i] for t in tail_nodes]
+                for n in nodes:
+                    en = get(n)
+                    if en is not None and en[1] == collision_sg and all(n is not c for c in colliding):
+                        colliding.append(n)
+                involved = sorted({get(n)[0] for n in colliding})
+                if any(parametric_block[b] for b in involved):
+                    _fail(group_idx, i, len(colliding), collision_sg, involved)
+
+
 class BlockSamplingProgram(eqx.Module):
     """An executable JAX block-sampling program.
 
@@ -182,6 +280,8 @@ class BlockSamplingProgram(eqx.Module):
         n_free_blocks = len(self.gibbs_spec.free_blocks)
         if len(self.samplers) != n_free_blocks:
             raise ValueError(f"Expected {n_free_blocks} samplers, received {len(self.samplers)}")
+
+        _validate_sampling_groups(gibbs_spec, samplers, interaction_groups)
 
         # first, construct a map from every head node to each interaction it
         # shows up in and where it shows up in that interaction
